@@ -1,0 +1,19 @@
+Tech stack
+- Winforms UI
+- Application/Services
+- Domain/Core
+- Sqlite/Files/APIs
+
+Requirements
+- This app is for tracking employee time and wages
+- A time entry consists of a start date and time and end date and time
+- The unit of a work week is from Saturday midnight to Saturday midnight.
+- A pay period is selectable from one week, two weeks, or one month.
+- A pay period is based on a full week with the first week starting the first full week of the month and finishing the last full week of the month even if that runs into the next week
+- The compensation payout date is selectable
+- An employee is a first and last name, birthdate, the option of full time and part time, overtime percentage, vacation days permitted, etc
+- A compensation has the types hourly, and salary
+- There will be a global table to set the hours of compensation for a holiday, vacation, sick days, etc.  I.e. a holiday adds 8 hours to the weekly total. A vacation adds 10 hours a day
+- The global table will be used unless a specific rate is set for an individual employee.
+- Each employee will have a table for setting vacation and holiday information the same as the global table, but doesn't need to be used.
+- The model will be structured such as Employee, Time Entry, CompensatedTimeOff (for vacations, holidays, sickdays), PayPeriod, etc. The model should be the source of truth and changes to the app should propogate through that. 
