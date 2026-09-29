@@ -269,6 +269,13 @@ UpgradeLog*.htm
 ServiceFabricBackup/
 *.rptproj.bak
 
+# WageTracker data: databases, backups, and payroll reports hold employee pay information
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.pdf
+
 # SQL Server files
 *.mdf
 *.ldf
