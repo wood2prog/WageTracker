@@ -92,12 +92,23 @@ internal sealed class InMemoryRuns : IPayrollRunRepository
 
 internal sealed class RecordingReportWriter : IPayrollReportWriter
 {
-    public List<PayrollRunDto> Written { get; } = [];
+    public List<PayrollReport> Written { get; } = [];
 
-    public Task<string> WriteAsync(PayrollRunDto run)
+    public Task<string> WriteAsync(PayrollReport report)
     {
-        Written.Add(run);
-        return Task.FromResult($"report-{run.Start:yyyy-MM-dd}.pdf");
+        Written.Add(report);
+        return Task.FromResult($"report-{report.Run.Start:yyyy-MM-dd}.pdf");
+    }
+}
+
+internal sealed class RecordingBackup : IDatabaseBackup
+{
+    public List<(DateTime Timestamp, int BackupsToKeep)> Calls { get; } = [];
+
+    public Task<string?> BackupAsync(DateTime timestamp, int backupsToKeep)
+    {
+        Calls.Add((timestamp, backupsToKeep));
+        return Task.FromResult<string?>($"backup-{timestamp:yyyy-MM-dd}.db");
     }
 }
 
@@ -120,6 +131,9 @@ internal sealed class TestApp
     public InMemorySettings Settings { get; } = new();
     public InMemoryRuns Runs { get; } = new();
     public RecordingReportWriter Reports { get; } = new();
+    public RecordingBackup Backup { get; } = new();
+
+    public BackupService BackupService => new(Settings, Backup, Clock);
 
     public EmployeeService EmployeeService => new(Employees, TimeOff, Settings);
     public TimeEntryService TimeEntryService => new(TimeEntries, Employees, Runs, Clock);

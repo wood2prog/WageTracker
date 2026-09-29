@@ -38,6 +38,17 @@ public sealed class SettingsService(IPayrollSettingsRepository settings, IPayrol
     public Task<PayrollSettingsDto> SetTimeOffCountsTowardOvertimeAsync(bool counts) =>
         ChangeAsync(s => s.TimeOffCountsTowardOvertime = counts);
 
+    /// <param name="name">Blank clears the name.</param>
+    public Task<PayrollSettingsDto> SetCompanyNameAsync(string? name) =>
+        ChangeAsync(s => s.SetCompanyName(name));
+
+    /// <param name="image">The contents of a PNG or JPEG file of at most 2 MB, or null to remove the logo.</param>
+    public Task<PayrollSettingsDto> SetCompanyLogoAsync(byte[]? image) =>
+        ChangeAsync(s => s.SetCompanyLogo(image));
+
+    public Task<PayrollSettingsDto> SetBackupsToKeepAsync(int count) =>
+        ChangeAsync(s => s.SetBackupsToKeep(count));
+
     public Task<PayrollSettingsDto> AddTimeOffTypeAsync(string name, decimal defaultHoursPerDay) =>
         ChangeAsync(s => s.AddTimeOffType(name, defaultHoursPerDay));
 

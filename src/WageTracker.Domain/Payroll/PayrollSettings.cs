@@ -10,6 +10,10 @@ public sealed class PayrollSettings
 {
     public const decimal DefaultOvertimeThresholdHours = 40m;
     public const int MaxPayoutDayOfMonth = 28;
+    public const int DefaultBackupsToKeep = 10;
+    public const int MaxBackupsToKeep = 365;
+    public const int MaxCompanyNameLength = 100;
+    public const int MaxLogoBytes = 2 * 1024 * 1024;
 
     private readonly List<TimeOffType> _timeOffTypes;
 
@@ -21,13 +25,19 @@ public sealed class PayrollSettings
         HolidayCalendar holidays,
         decimal overtimeThresholdHours = DefaultOvertimeThresholdHours,
         bool timeOffCountsTowardOvertime = true,
-        DateOnly? scheduleEffectiveFrom = null)
+        DateOnly? scheduleEffectiveFrom = null,
+        string? companyName = null,
+        byte[]? companyLogo = null,
+        int backupsToKeep = DefaultBackupsToKeep)
     {
         ChangeSchedule(schedule, scheduleEffectiveFrom);
         SetPayoutDayOfMonth(payoutDayOfMonth);
         SetOvertimeThresholdHours(overtimeThresholdHours);
         TimeOffCountsTowardOvertime = timeOffCountsTowardOvertime;
         Holidays = holidays;
+        SetCompanyName(companyName);
+        SetCompanyLogo(companyLogo);
+        SetBackupsToKeep(backupsToKeep);
 
         _timeOffTypes = timeOffTypes.ToList();
         if (_timeOffTypes.Count(t => t.IsVacation) != 1 || _timeOffTypes.Count(t => t.IsHoliday) != 1)
@@ -66,6 +76,15 @@ public sealed class PayrollSettings
     /// every hour over the threshold is overtime, however it was earned.
     /// </summary>
     public bool TimeOffCountsTowardOvertime { get; set; }
+
+    /// <summary>Shown on the payroll report. Null if not set.</summary>
+    public string? CompanyName { get; private set; }
+
+    /// <summary>A PNG or JPEG image shown on the payroll report. Null if not set.</summary>
+    public byte[]? CompanyLogo { get; private set; }
+
+    /// <summary>How many automatic database backups to keep; older ones are deleted.</summary>
+    public int BackupsToKeep { get; private set; }
 
     public IReadOnlyList<TimeOffType> TimeOffTypes => _timeOffTypes;
 
@@ -131,6 +150,43 @@ public sealed class PayrollSettings
             throw new DomainException("The overtime threshold can have at most two decimal places.");
         OvertimeThresholdHours = hours;
     }
+
+    /// <param name="name">Blank clears the name.</param>
+    public void SetCompanyName(string? name)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        if (trimmed?.Length > MaxCompanyNameLength)
+            throw new DomainException($"The company name can be at most {MaxCompanyNameLength} characters.");
+        CompanyName = trimmed;
+    }
+
+    /// <param name="image">A PNG or JPEG image of at most 2 MB, or null to remove the logo.</param>
+    public void SetCompanyLogo(byte[]? image)
+    {
+        if (image is null)
+        {
+            CompanyLogo = null;
+            return;
+        }
+        if (image.Length > MaxLogoBytes)
+            throw new DomainException("The logo image can be at most 2 MB.");
+        if (!IsPng(image) && !IsJpeg(image))
+            throw new DomainException("The logo must be a PNG or JPEG image.");
+        CompanyLogo = image.ToArray();
+    }
+
+    public void SetBackupsToKeep(int count)
+    {
+        if (count < 1 || count > MaxBackupsToKeep)
+            throw new DomainException($"The number of backups to keep must be between 1 and {MaxBackupsToKeep}.");
+        BackupsToKeep = count;
+    }
+
+    private static bool IsPng(byte[] image) =>
+        image.AsSpan().StartsWith((ReadOnlySpan<byte>)[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+    private static bool IsJpeg(byte[] image) =>
+        image.AsSpan().StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]);
 
     public TimeOffType AddTimeOffType(string name, decimal defaultHoursPerDay)
     {

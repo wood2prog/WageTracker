@@ -63,6 +63,45 @@ public class SettingsServiceTests
     }
 
     [Fact]
+    public async Task Backups_keep_the_number_set_in_settings()
+    {
+        var app = new TestApp();
+        await app.SettingsService.SetBackupsToKeepAsync(5);
+
+        var path = await app.BackupService.BackupAsync();
+
+        Assert.Equal("backup-2026-09-29.db", path);
+        Assert.Equal((app.Clock.Now, 5), app.Backup.Calls.Single());
+    }
+
+    [Fact]
+    public async Task Backups_use_the_default_count_before_setup()
+    {
+        var app = new TestApp();
+        app.Settings.Current = null;
+
+        await app.BackupService.BackupAsync();
+
+        Assert.Equal(PayrollSettings.DefaultBackupsToKeep, app.Backup.Calls.Single().BackupsToKeep);
+    }
+
+    [Fact]
+    public async Task The_report_gets_the_company_name_and_logo()
+    {
+        var app = new TestApp();
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00];
+        await app.SettingsService.SetCompanyNameAsync("Acme Tools");
+        var settings = await app.SettingsService.SetCompanyLogoAsync(png);
+
+        await app.PayrollService.FinalizeAsync(TestApp.Sunday);
+
+        Assert.Equal("Acme Tools", settings.CompanyName);
+        var report = app.Reports.Written.Single();
+        Assert.Equal("Acme Tools", report.CompanyName);
+        Assert.Equal(png, report.CompanyLogo);
+    }
+
+    [Fact]
     public async Task Holidays_are_added_and_listed_on_their_observed_dates()
     {
         var app = new TestApp();

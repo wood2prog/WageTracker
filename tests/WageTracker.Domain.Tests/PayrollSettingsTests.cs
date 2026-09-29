@@ -18,6 +18,72 @@ public class PayrollSettingsTests
         Assert.Equal(new DateOnly(year, month, expectedDay), settings.PayoutDateFor(september));
     }
 
+    /// <summary>A valid 1×1 PNG.</summary>
+    private static readonly byte[] Png = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
+
+    [Fact]
+    public void Company_name_is_trimmed_and_blank_clears_it()
+    {
+        var settings = Settings();
+
+        settings.SetCompanyName("  Acme Tools  ");
+        Assert.Equal("Acme Tools", settings.CompanyName);
+
+        settings.SetCompanyName("   ");
+        Assert.Null(settings.CompanyName);
+    }
+
+    [Fact]
+    public void Company_name_has_a_maximum_length() =>
+        Assert.Throws<DomainException>(() => Settings().SetCompanyName(new string('x', 101)));
+
+    [Fact]
+    public void Logo_accepts_png_and_jpeg_and_can_be_removed()
+    {
+        var settings = Settings();
+
+        settings.SetCompanyLogo(Png);
+        Assert.Equal(Png, settings.CompanyLogo);
+        settings.SetCompanyLogo([0xFF, 0xD8, 0xFF, 0xE0, 0x00]);
+        settings.SetCompanyLogo(null);
+        Assert.Null(settings.CompanyLogo);
+    }
+
+    [Fact]
+    public void Logo_rejects_other_files() =>
+        Assert.Throws<DomainException>(() => Settings().SetCompanyLogo("GIF89a"u8.ToArray()));
+
+    [Fact]
+    public void Logo_rejects_files_over_2_MB()
+    {
+        var huge = new byte[PayrollSettings.MaxLogoBytes + 1];
+        Png.CopyTo(huge, 0);
+
+        Assert.Throws<DomainException>(() => Settings().SetCompanyLogo(huge));
+    }
+
+    [Fact]
+    public void Logo_is_copied_so_later_changes_to_the_array_do_not_leak_in()
+    {
+        var settings = Settings();
+        var image = Png.ToArray();
+        settings.SetCompanyLogo(image);
+
+        image[^1] = 0;
+
+        Assert.Equal(Png, settings.CompanyLogo);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(366)]
+    public void Backups_to_keep_must_be_1_to_365(int count) =>
+        Assert.Throws<DomainException>(() => Settings().SetBackupsToKeep(count));
+
+    [Fact]
+    public void Backups_to_keep_defaults_to_10() => Assert.Equal(10, Settings().BackupsToKeep);
+
     [Fact]
     public void After_a_schedule_change_the_first_period_starts_on_the_effective_date()
     {

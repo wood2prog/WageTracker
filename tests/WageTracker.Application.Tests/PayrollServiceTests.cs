@@ -36,7 +36,7 @@ public class PayrollServiceTests
         Assert.True(result.Run.IsLocked);
         Assert.Equal(app.Clock.Now, result.Run.LockedAt);
         Assert.Equal("report-2026-09-06.pdf", result.ReportLocation);
-        Assert.Same(result.Run, app.Reports.Written.Single());
+        Assert.Same(result.Run, app.Reports.Written.Single().Run);
         Assert.True(app.Runs.Items.Single().IsLocked);
     }
 

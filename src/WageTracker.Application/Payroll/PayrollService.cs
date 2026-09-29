@@ -57,16 +57,20 @@ public sealed class PayrollService(
         await runs.AddAsync(run);
 
         var dto = ToDto(run, staff);
-        return new FinalizeResult(dto, await reportWriter.WriteAsync(dto));
+        return new FinalizeResult(dto, await reportWriter.WriteAsync(Report(dto, current)));
     }
 
     /// <summary>Writes the report again for a locked period, for example if the first copy was lost.</summary>
     public async Task<string> ExportReportAsync(DateOnly date)
     {
+        var current = await settings.RequireAsync();
         var run = await LockedRunContainingAsync(date)
             ?? throw new DomainException($"The pay period containing {date:yyyy-MM-dd} has not been finalized yet.");
-        return await reportWriter.WriteAsync(ToDto(run, await employees.ListAsync()));
+        return await reportWriter.WriteAsync(Report(ToDto(run, await employees.ListAsync()), current));
     }
+
+    private static PayrollReport Report(PayrollRunDto run, PayrollSettings current) =>
+        new(run, current.CompanyName, current.CompanyLogo);
 
     private async Task<PayrollRun?> LockedRunContainingAsync(DateOnly date) =>
         (await runs.ListLockedOverlappingAsync(date, date)).SingleOrDefault();

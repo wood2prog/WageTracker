@@ -72,6 +72,9 @@ public sealed record PayrollSettingsDto(
     int PayoutDayOfMonth,
     decimal OvertimeThresholdHours,
     bool TimeOffCountsTowardOvertime,
+    string? CompanyName,
+    byte[]? CompanyLogo,
+    int BackupsToKeep,
     IReadOnlyList<TimeOffTypeDto> TimeOffTypes,
     IReadOnlyList<CompanyHolidayDto> Holidays)
 {
@@ -82,6 +85,9 @@ public sealed record PayrollSettingsDto(
         s.PayoutDayOfMonth,
         s.OvertimeThresholdHours,
         s.TimeOffCountsTowardOvertime,
+        s.CompanyName,
+        s.CompanyLogo,
+        s.BackupsToKeep,
         s.TimeOffTypes.Select(TimeOffTypeDto.From).ToList(),
         s.Holidays.Holidays.Select(CompanyHolidayDto.From).ToList());
 }

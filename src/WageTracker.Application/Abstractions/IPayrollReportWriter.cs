@@ -6,5 +6,5 @@ namespace WageTracker.Application.Abstractions;
 public interface IPayrollReportWriter
 {
     /// <returns>Where the report was written, such as a file path, to show the user.</returns>
-    Task<string> WriteAsync(PayrollRunDto run);
+    Task<string> WriteAsync(PayrollReport report);
 }

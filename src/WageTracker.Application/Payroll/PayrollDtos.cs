@@ -59,5 +59,9 @@ public sealed record PayrollRunDto(
     public decimal TotalGrossPay => Statements.Sum(s => s.GrossPay);
 }
 
+/// <summary>What goes into the payroll accountant's report.</summary>
+/// <param name="CompanyLogo">A PNG or JPEG image, or null.</param>
+public sealed record PayrollReport(PayrollRunDto Run, string? CompanyName, byte[]? CompanyLogo);
+
 /// <param name="ReportLocation">Where the payroll accountant's report was written.</param>
 public sealed record FinalizeResult(PayrollRunDto Run, string ReportLocation);

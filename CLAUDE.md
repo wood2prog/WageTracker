@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-The domain and application layers exist; the infrastructure (SQLite) and WinForms UI layers do not yet. Requirements come from [Specs.txt](Specs.txt). When you add projects or commands, update this file to match.
+The domain, application, and infrastructure layers exist; the WinForms UI does not yet. Requirements come from [Specs.txt](Specs.txt). When you add projects or commands, update this file to match.
 
 ## Build and test
 
@@ -23,7 +23,14 @@ Layout:
   - `AddWageTrackerApplication()`, which registers the services.
 - Services take and return DTO records and never hand domain entities to the UI. Every change goes through a domain method. Before changing a date or time, a service checks it isn't in a locked pay period.
 - Repositories save each write immediately. No use case changes more than one aggregate, so there is no unit of work.
-- Tests use xUnit. Application tests use the in-memory fakes in `tests/WageTracker.Application.Tests/Fakes.cs`.
+- `src/WageTracker.Infrastructure` references Application. It contains:
+  - SQLite repositories written by hand with `Microsoft.Data.Sqlite`. There is no ORM: repositories rebuild domain objects through their public load constructors.
+  - The QuestPDF report writer (Community license).
+  - `SqliteDatabaseBackup`, which makes the backups.
+  - `AddWageTrackerInfrastructure()`, which registers them.
+- `StorageOptions` sets the storage locations. The database defaults to `%LOCALAPPDATA%\WageTracker\wagetracker.db`, outside OneDrive. Reports default to `Documents\WageTracker Reports`, and backups to `Documents\WageTracker Backups`.
+- **Schema**: migrations live in `Persistence/Schema.cs` and run automatically on first connection, tracked with `PRAGMA user_version`. Never edit a shipped migration; append a new one. Decimals are stored as invariant text so rates and money stay exact. Dates are `yyyy-MM-dd`, and date-times are local `yyyy-MM-ddTHH:mm:ss.fffffff`.
+- Tests use xUnit. Application tests use the in-memory fakes in `tests/WageTracker.Application.Tests/Fakes.cs`. Infrastructure tests use a temp-folder database (`TempDatabase`) and include end-to-end tests that wire the real DI container.
 - Business rule violations throw `DomainException`. A missing record throws `NotFoundException`, and missing settings throw `SettingsNotConfiguredException`. The UI shows the message for all three.
 
 ## Purpose
@@ -49,7 +56,16 @@ Domain entities named in the spec: `Employee`, `TimeEntry`, `CompensatedTimeOff`
 - **Pay period**: the user picks one week, two weeks, or one month. Pay periods are built from whole weeks. For the monthly option, **a week belongs to the month its Sunday falls in**. The monthly period runs from the first Sunday of the month through the Saturday after the last Sunday of the month, so it can end in the next month. Any days before the month's first Sunday belong to the previous month's period. Example: September 2026 runs Sun Sept 6 – Sat Oct 3, and Sept 1–5 fall in August's period.
   - **Two-week option**: the user sets an anchor Sunday, and periods repeat every 14 days from it without regard to month boundaries.
 - **Payout date**: a fixed day of the month from 1 to 28, set in settings. Capping it at 28 means the day exists in every month. A period is paid on the first payout day that falls strictly after its last Saturday. This applies to every schedule, so several weekly periods can share one payout date. It can also push the payout into the month after next. Example: September's period ends Oct 3, so with a payout day of the 1st it's paid Nov 1.
-- **Settings page**: the payout day, pay schedule, overtime threshold, "time off counts toward overtime" option, time-off types, and holiday calendar are all set there (`PayrollSettings`).
+- **Settings page**: all of these live in `PayrollSettings` and are set there:
+  - the payout day and pay schedule;
+  - the overtime threshold and the "time off counts toward overtime" option;
+  - time-off types and the holiday calendar;
+  - the company name (optional, up to 100 characters) and logo (optional PNG or JPEG, up to 2 MB, stored in the database), both shown in the report header;
+  - the number of backups to keep (1–365, default 10).
+- **Backups**:
+  - The UI calls `BackupService.BackupAsync()` when the app exits.
+  - Each backup is a consistent SQLite online-backup copy named `WageTracker yyyy-MM-dd HH-mm-ss.db`, saved in `Documents\WageTracker Backups`.
+  - After each backup, the oldest backups beyond the configured count are deleted. Only files whose names match that exact pattern are ever deleted.
 - **Employee**: first and last name, birthdate, hire date, optional end date, full-time or part-time, overtime percentage, vacation days permitted, and more fields to come.
 - **Employment dates**:
   - Both the hire date and the end date are inclusive.

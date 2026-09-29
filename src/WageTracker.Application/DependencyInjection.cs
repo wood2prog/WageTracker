@@ -11,8 +11,8 @@ namespace WageTracker.Application;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Registers the use-case services and the system clock. Infrastructure registers the repositories
-    /// and the report writer.
+    /// Registers the use-case services and the system clock. Infrastructure registers the repositories,
+    /// the report writer, and the database backup.
     /// </summary>
     public static IServiceCollection AddWageTrackerApplication(this IServiceCollection services)
     {
@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddTransient<TimeOffService>();
         services.AddTransient<SettingsService>();
         services.AddTransient<HolidayService>();
+        services.AddTransient<BackupService>();
         services.AddTransient<PayrollService>();
         return services;
     }
