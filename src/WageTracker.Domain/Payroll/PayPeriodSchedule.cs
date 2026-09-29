@@ -9,6 +9,9 @@ public abstract class PayPeriodSchedule
 {
     public abstract PayFrequency Frequency { get; }
 
+    /// <summary>For a two-week schedule, the Sunday periods repeat from; otherwise null.</summary>
+    public virtual DateOnly? Anchor => null;
+
     public abstract PayPeriod PeriodContaining(DateOnly date);
 
     public PayPeriod Next(PayPeriod period) => PeriodContaining(period.End.AddDays(1));
@@ -31,15 +34,15 @@ public abstract class PayPeriodSchedule
 
     private sealed class BiWeeklySchedule(WorkWeek anchor) : PayPeriodSchedule
     {
-        public WorkWeek Anchor { get; } = anchor;
-
         public override PayFrequency Frequency => PayFrequency.BiWeekly;
+
+        public override DateOnly? Anchor => anchor.Start;
 
         public override PayPeriod PeriodContaining(DateOnly date)
         {
-            var daysFromAnchor = date.DayNumber - Anchor.Start.DayNumber;
+            var daysFromAnchor = date.DayNumber - anchor.Start.DayNumber;
             var periodIndex = (int)Math.Floor(daysFromAnchor / 14.0);
-            return new PayPeriod(new WorkWeek(Anchor.Start.AddDays(periodIndex * 14)), 2);
+            return new PayPeriod(new WorkWeek(anchor.Start.AddDays(periodIndex * 14)), 2);
         }
     }
 

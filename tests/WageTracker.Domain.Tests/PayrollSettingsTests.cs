@@ -18,6 +18,35 @@ public class PayrollSettingsTests
         Assert.Equal(new DateOnly(year, month, expectedDay), settings.PayoutDateFor(september));
     }
 
+    [Fact]
+    public void After_a_schedule_change_the_first_period_starts_on_the_effective_date()
+    {
+        var settings = Settings();
+        var effective = new DateOnly(2026, 9, 13);
+
+        settings.ChangeSchedule(PayPeriodSchedule.Monthly(), effective);
+        var first = settings.PeriodContaining(new DateOnly(2026, 9, 20));
+        var next = settings.PeriodContaining(new DateOnly(2026, 10, 10));
+
+        Assert.Equal(effective, first.Start);
+        Assert.Equal(new DateOnly(2026, 10, 3), first.End);
+        Assert.Equal(3, first.WeekCount);
+        Assert.Equal(new DateOnly(2026, 10, 4), next.Start);
+    }
+
+    [Fact]
+    public void Dates_before_a_schedule_change_have_no_current_period()
+    {
+        var settings = Settings();
+        settings.ChangeSchedule(PayPeriodSchedule.Monthly(), new DateOnly(2026, 9, 13));
+
+        Assert.Throws<DomainException>(() => settings.PeriodContaining(new DateOnly(2026, 9, 12)));
+    }
+
+    [Fact]
+    public void A_schedule_change_must_start_on_a_Sunday() =>
+        Assert.Throws<DomainException>(() => Settings().ChangeSchedule(PayPeriodSchedule.Monthly(), new DateOnly(2026, 9, 14)));
+
     [Theory]
     [InlineData(0)]
     [InlineData(29)]

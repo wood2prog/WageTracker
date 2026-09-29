@@ -39,7 +39,9 @@ public sealed class PayStatement(
 
     public decimal OvertimeMultiplier { get; } = overtimeMultiplier;
 
-    /// <summary>Hourly: regular hours (worked and time off) times the rate. Salary: the weekly salary for each week.</summary>
+    /// <summary>
+    /// Hourly: regular hours (worked and time off) times the rate. Salary: weekly salary ÷ 5 for each weekday employed.
+    /// </summary>
     public decimal BasePay { get; } = basePay;
 
     /// <summary>
@@ -48,10 +50,10 @@ public sealed class PayStatement(
     /// </summary>
     public decimal OvertimePay { get; } = overtimePay;
 
-    /// <summary>Salaried overtime earned in this period. It is paid in the next period.</summary>
+    /// <summary>Salaried overtime earned in this period. It is paid in the next period, unless this is the employee's final period.</summary>
     public decimal DeferredOvertimePay { get; } = deferredOvertimePay;
 
-    /// <summary>Unused vacation days paid out. Only nonzero in the last pay period of the year.</summary>
+    /// <summary>Unused vacation days paid out. Only nonzero in the last pay period of the year or an employee's final period.</summary>
     public int VacationDaysPaidOut { get; } = vacationDaysPaidOut;
 
     public decimal VacationPayout { get; } = vacationPayout;
@@ -100,13 +102,16 @@ public sealed class PayStatement(
         var overtimeRate = hourlyRate * employee.OvertimeMultiplier;
         var overtimeEarned = compensation.OvertimeEligible ? weeks.Sum(w => w.OvertimeHours) * overtimeRate : 0m;
         var carriedOvertime = previous?.DeferredOvertimePay ?? 0m;
+        var isFinalPeriod = employee.EndDate is { } lastDay && period.Contains(lastDay);
 
         decimal basePay, overtimePay, deferredOvertimePay;
         if (compensation.Type == CompensationType.Salary)
         {
-            basePay = weeks.Count * compensation.WeeklySalary;
-            overtimePay = carriedOvertime;
-            deferredOvertimePay = overtimeEarned;
+            // A week is paid in fifths, one for each weekday employed, so partial weeks at hire and end are prorated.
+            basePay = weeks.Sum(w => compensation.WeeklySalary * employee.WeekdaysEmployed(w.Week.Start, w.Week.End) / 5m);
+            // Salaried overtime is normally paid next period, but a leaver's final period settles everything.
+            overtimePay = carriedOvertime + (isFinalPeriod ? overtimeEarned : 0m);
+            deferredOvertimePay = isFinalPeriod ? 0m : overtimeEarned;
         }
         else
         {
@@ -145,7 +150,8 @@ public sealed class PayStatement(
             .Where(t => week.Contains(t.Date))
             .Sum(t => employee.ResolveTimeOffHours(settings.GetTimeOffType(t.TimeOffTypeId)));
         var holidayHours = employee.GetsCompensatedTimeOff
-            ? settings.Holidays.Between(week.Start, week.End).Select(h => h.Date).Distinct().Count()
+            ? settings.Holidays.Between(week.Start, week.End)
+                .Select(h => h.Date).Distinct().Count(employee.IsEmployedOn)
                 * employee.ResolveTimeOffHours(settings.HolidayType)
             : 0m;
         var timeOffHours = bookedHours + holidayHours;
@@ -156,11 +162,22 @@ public sealed class PayStatement(
         return new WeekSummary(week, worked, timeOffHours, overtime);
     }
 
+    /// <summary>
+    /// Unused vacation is paid out for the year this period closes, and for the year of the employee's
+    /// end date if they leave during this period.
+    /// </summary>
     private static int UnusedVacationDaysToPayOut(
         Employee employee, PayPeriod period, PayrollSettings settings, List<CompensatedTimeOff> daysOff)
     {
-        if (period.ClosesYear is not { } year || !employee.GetsCompensatedTimeOff)
+        if (!employee.GetsCompensatedTimeOff)
             return 0;
-        return employee.VacationBalance(year, settings.VacationType, daysOff).Remaining;
+
+        var years = new HashSet<int>();
+        if (period.ClosesYear is { } closedYear && employee.IsEmployedOn(new DateOnly(closedYear, 12, 31)))
+            years.Add(closedYear);
+        if (employee.EndDate is { } lastDay && period.Contains(lastDay))
+            years.Add(lastDay.Year);
+
+        return years.Sum(year => employee.VacationBalance(year, settings.VacationType, daysOff).Remaining);
     }
 }

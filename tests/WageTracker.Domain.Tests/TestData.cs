@@ -10,12 +10,19 @@ internal static class TestData
     /// <summary>Sunday, September 6, 2026.</summary>
     public static readonly DateOnly Sunday = new(2026, 9, 6);
 
-    public static Employee Hourly(decimal rate = 20m, EmploymentType type = EmploymentType.FullTime, int vacationDays = 10) =>
-        new("Ada", "Lovelace", new DateOnly(1990, 12, 10), type, Compensation.Hourly(rate), 50m, vacationDays);
+    /// <summary>Hired January 1, 2020 unless <paramref name="hired"/> is given.</summary>
+    public static readonly DateOnly DefaultHireDate = new(2020, 1, 1);
 
-    public static Employee Salaried(decimal annual = 52_000m, bool overtimeEligible = false) =>
-        new("Grace", "Hopper", new DateOnly(1985, 12, 9), EmploymentType.FullTime,
-            Compensation.Salary(annual, overtimeEligible), 50m, 15);
+    public static Employee Hourly(
+        decimal rate = 20m, EmploymentType type = EmploymentType.FullTime, int vacationDays = 10,
+        DateOnly? hired = null, DateOnly? ended = null) =>
+        new(Guid.NewGuid(), "Ada", "Lovelace", new DateOnly(1990, 12, 10), hired ?? DefaultHireDate, ended,
+            type, Compensation.Hourly(rate), 50m, vacationDays);
+
+    public static Employee Salaried(
+        decimal annual = 52_000m, bool overtimeEligible = false, DateOnly? hired = null, DateOnly? ended = null) =>
+        new(Guid.NewGuid(), "Grace", "Hopper", new DateOnly(1985, 12, 9), hired ?? DefaultHireDate, ended,
+            EmploymentType.FullTime, Compensation.Salary(annual, overtimeEligible), 50m, 15);
 
     /// <summary>Weekly schedule, payout on the 10th, Holiday 8 h, Vacation 10 h, Sick 8 h.</summary>
     public static PayrollSettings Settings(PayPeriodSchedule? schedule = null) =>

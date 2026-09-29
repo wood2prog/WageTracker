@@ -1,4 +1,5 @@
 using WageTracker.Domain.Common;
+using WageTracker.Domain.Employees;
 
 namespace WageTracker.Domain.TimeTracking;
 
@@ -30,22 +31,24 @@ public sealed class TimeEntry
 
     /// <summary>
     /// Creates a new entry. It must end after it starts, last no more than 24 hours, not end after
-    /// <paramref name="now"/>, and not overlap the employee's other entries.
+    /// <paramref name="now"/>, fall within the employee's employment, and not overlap their other entries.
     /// </summary>
     /// <param name="existingEntries">The employee's entries around this time.</param>
     public static TimeEntry Record(
-        Guid employeeId, DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries, DateTime now)
+        Employee employee, DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries, DateTime now)
     {
-        var entry = new TimeEntry(Guid.NewGuid(), employeeId, start, end);
-        entry.EnsureFitsAmong(existingEntries, now);
+        var entry = new TimeEntry(Guid.NewGuid(), employee.Id, start, end);
+        entry.EnsureFitsAmong(employee, existingEntries, now);
         return entry;
     }
 
     /// <summary>Moves the entry, applying the same rules as <see cref="Record"/>.</summary>
-    public void Reschedule(DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries, DateTime now)
+    public void Reschedule(Employee employee, DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries, DateTime now)
     {
+        if (employee.Id != EmployeeId)
+            throw new DomainException("A time entry can only be moved for its own employee.");
         var moved = new TimeEntry(Id, EmployeeId, start, end);
-        moved.EnsureFitsAmong(existingEntries, now);
+        moved.EnsureFitsAmong(employee, existingEntries, now);
         (Start, End) = (start, end);
     }
 
@@ -62,10 +65,12 @@ public sealed class TimeEntry
 
     public bool Overlaps(TimeEntry other) => Start < other.End && other.Start < End;
 
-    private void EnsureFitsAmong(IEnumerable<TimeEntry> existingEntries, DateTime now)
+    private void EnsureFitsAmong(Employee employee, IEnumerable<TimeEntry> existingEntries, DateTime now)
     {
         if (End > now)
             throw new DomainException("A time entry cannot end in the future.");
+        employee.EnsureEmployedOn(DateOnly.FromDateTime(Start));
+        employee.EnsureEmployedOn(DateOnly.FromDateTime(End.AddTicks(-1)));
 
         var clash = existingEntries.FirstOrDefault(e => e.EmployeeId == EmployeeId && e.Id != Id && Overlaps(e));
         if (clash is not null)

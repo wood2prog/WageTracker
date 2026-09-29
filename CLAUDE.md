@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-The domain model exists; the UI, application, and infrastructure layers do not yet. Requirements come from [Specs.txt](Specs.txt). When you add projects or commands, update this file to match.
+The domain and application layers exist; the infrastructure (SQLite) and WinForms UI layers do not yet. Requirements come from [Specs.txt](Specs.txt). When you add projects or commands, update this file to match.
 
 ## Build and test
 
@@ -17,8 +17,14 @@ The domain model exists; the UI, application, and infrastructure layers do not y
 Layout:
 
 - `src/WageTracker.Domain` has no dependencies and targets `net10.0`. Folders: `Calendar` (WorkWeek), `Employees`, `TimeTracking` (TimeEntry), `TimeOff`, `Payroll` (schedules, `PayrollSettings`, `PayStatement` calculation, and `PayrollRun` locking).
-- `tests/WageTracker.Domain.Tests` uses xUnit.
-- Business rule violations throw `DomainException`.
+- `src/WageTracker.Application` references only Domain. It contains:
+  - `Abstractions`: the ports Infrastructure implements. These are the repositories (in `Repositories.cs`), `IPayrollReportWriter`, and `IClock`.
+  - One use-case service per area: `EmployeeService`, `TimeEntryService`, `TimeOffService`, `SettingsService`, `HolidayService`, and `PayrollService`.
+  - `AddWageTrackerApplication()`, which registers the services.
+- Services take and return DTO records and never hand domain entities to the UI. Every change goes through a domain method. Before changing a date or time, a service checks it isn't in a locked pay period.
+- Repositories save each write immediately. No use case changes more than one aggregate, so there is no unit of work.
+- Tests use xUnit. Application tests use the in-memory fakes in `tests/WageTracker.Application.Tests/Fakes.cs`.
+- Business rule violations throw `DomainException`. A missing record throws `NotFoundException`, and missing settings throw `SettingsNotConfiguredException`. The UI shows the message for all three.
 
 ## Purpose
 
@@ -44,7 +50,15 @@ Domain entities named in the spec: `Employee`, `TimeEntry`, `CompensatedTimeOff`
   - **Two-week option**: the user sets an anchor Sunday, and periods repeat every 14 days from it without regard to month boundaries.
 - **Payout date**: a fixed day of the month from 1 to 28, set in settings. Capping it at 28 means the day exists in every month. A period is paid on the first payout day that falls strictly after its last Saturday. This applies to every schedule, so several weekly periods can share one payout date. It can also push the payout into the month after next. Example: September's period ends Oct 3, so with a payout day of the 1st it's paid Nov 1.
 - **Settings page**: the payout day, pay schedule, overtime threshold, "time off counts toward overtime" option, time-off types, and holiday calendar are all set there (`PayrollSettings`).
-- **Employee**: first and last name, birthdate, full-time or part-time, overtime percentage, vacation days permitted, and more fields to come.
+- **Employee**: first and last name, birthdate, hire date, optional end date, full-time or part-time, overtime percentage, vacation days permitted, and more fields to come.
+- **Employment dates**:
+  - Both the hire date and the end date are inclusive.
+  - Time entries and time off outside employment are refused. An entry that ends exactly at midnight after the last day is allowed.
+  - Holidays are credited only on days the employee was employed.
+  - Payroll includes only employees who were employed on at least one day of the period.
+  - Salaried pay for a partial week is weekly salary ÷ 5 for each Monday–Friday employed.
+  - The vacation allowance is **not** prorated in the hire or end year.
+  - In a leaver's final period (the one containing their end date), unused vacation is paid out, and salaried overtime earned that period is paid then instead of being deferred.
 - **Full-time vs. part-time**: only full-time employees get compensated time off (holidays, vacation, and other types) and the year-end vacation payout. Part-time employees are paid only for hours worked, plus overtime.
 - **Compensation types**: hourly and salary. Salary pays annual ÷ 52 for each week in the period.
 - **Overtime**:
@@ -63,3 +77,6 @@ Domain entities named in the spec: `Employee`, `TimeEntry`, `CompensatedTimeOff`
   - No other time off can be booked on a company holiday.
 - **Vacation**: the permitted days are per calendar year and are checked off as they're used. Booking beyond the allowance is refused. Unused days are paid out in the last pay period of the year, meaning the period that contains Dec 31. The payout is days × vacation hours × hourly rate. For salaried employees, that rate is weekly salary ÷ threshold.
 - **Locking**: when the report for the payroll accountant is created, the period's `PayrollRun` locks. It stores each `PayStatement` as a snapshot, and nothing dated inside a locked period can change.
+  - Periods are finalized **in order**: only the period right after the latest locked one can be finalized, and only after it has ended.
+  - The report is a **PDF**. For each employee it shows the pay lines (base, overtime including carried-over overtime, deferred overtime, vacation payout, gross) and a week-by-week table of worked, time-off, regular, and overtime hours. Grand totals come at the end. Infrastructure writes it through `IPayrollReportWriter`.
+- **Changing the pay schedule**: a new schedule takes effect the day after the last locked period (`PayrollSettings.ScheduleEffectiveFrom`). The first new period is trimmed to start on that Sunday. Dates before it belong to locked runs, so look those runs up rather than asking the schedule.

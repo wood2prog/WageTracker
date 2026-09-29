@@ -9,11 +9,13 @@ public sealed class Employee
         string firstName,
         string lastName,
         DateOnly birthDate,
+        DateOnly hireDate,
         EmploymentType employmentType,
         Compensation compensation,
         decimal overtimePercentage,
         int vacationDaysPermitted)
-        : this(Guid.NewGuid(), firstName, lastName, birthDate, employmentType, compensation, overtimePercentage, vacationDaysPermitted)
+        : this(Guid.NewGuid(), firstName, lastName, birthDate, hireDate, null, employmentType, compensation,
+            overtimePercentage, vacationDaysPermitted)
     {
     }
 
@@ -22,6 +24,8 @@ public sealed class Employee
         string firstName,
         string lastName,
         DateOnly birthDate,
+        DateOnly hireDate,
+        DateOnly? endDate,
         EmploymentType employmentType,
         Compensation compensation,
         decimal overtimePercentage,
@@ -30,6 +34,7 @@ public sealed class Employee
         Id = id;
         Rename(firstName, lastName);
         BirthDate = birthDate;
+        ChangeEmploymentDates(hireDate, endDate);
         EmploymentType = employmentType;
         Compensation = compensation;
         SetOvertimePercentage(overtimePercentage);
@@ -45,6 +50,12 @@ public sealed class Employee
     public string FullName => $"{FirstName} {LastName}";
 
     public DateOnly BirthDate { get; private set; }
+
+    /// <summary>The first day of employment.</summary>
+    public DateOnly HireDate { get; private set; }
+
+    /// <summary>The last day of employment (inclusive), or null while still employed.</summary>
+    public DateOnly? EndDate { get; private set; }
 
     public EmploymentType EmploymentType { get; private set; }
 
@@ -78,6 +89,38 @@ public sealed class Employee
     }
 
     public void ChangeBirthDate(DateOnly birthDate) => BirthDate = birthDate;
+
+    /// <param name="endDate">The last day worked, or null while still employed.</param>
+    public void ChangeEmploymentDates(DateOnly hireDate, DateOnly? endDate)
+    {
+        if (endDate < hireDate)
+            throw new DomainException("The end date cannot be before the hire date.");
+        HireDate = hireDate;
+        EndDate = endDate;
+    }
+
+    public bool IsEmployedOn(DateOnly date) => date >= HireDate && !(date > EndDate);
+
+    /// <summary>Whether the employee was employed on any day from <paramref name="from"/> through <paramref name="to"/>.</summary>
+    public bool IsEmployedDuring(DateOnly from, DateOnly to) => HireDate <= to && !(EndDate < from);
+
+    /// <summary>Monday–Friday days employed from <paramref name="from"/> through <paramref name="to"/>.</summary>
+    public int WeekdaysEmployed(DateOnly from, DateOnly to)
+    {
+        var count = 0;
+        for (var date = from; date <= to; date = date.AddDays(1))
+        {
+            if (date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) && IsEmployedOn(date))
+                count++;
+        }
+        return count;
+    }
+
+    public void EnsureEmployedOn(DateOnly date)
+    {
+        if (!IsEmployedOn(date))
+            throw new DomainException($"{FullName} is not employed on {date:yyyy-MM-dd}.");
+    }
 
     public void ChangeEmploymentType(EmploymentType employmentType) => EmploymentType = employmentType;
 
@@ -124,6 +167,7 @@ public sealed class Employee
     public CompensatedTimeOff BookTimeOff(
         DateOnly date, TimeOffType type, IEnumerable<CompensatedTimeOff> existingTimeOff, HolidayCalendar holidays)
     {
+        EnsureEmployedOn(date);
         if (!GetsCompensatedTimeOff)
             throw new DomainException($"{FullName} is part-time and does not get compensated time off.");
         if (type.IsHoliday)

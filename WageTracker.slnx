@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/WageTracker.Application/WageTracker.Application.csproj" />
     <Project Path="src/WageTracker.Domain/WageTracker.Domain.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/WageTracker.Application.Tests/WageTracker.Application.Tests.csproj" />
     <Project Path="tests/WageTracker.Domain.Tests/WageTracker.Domain.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using WageTracker.Domain.Calendar;
 using WageTracker.Domain.Common;
 using WageTracker.Domain.TimeOff;
 
@@ -18,9 +20,10 @@ public sealed class PayrollSettings
         IEnumerable<TimeOffType> timeOffTypes,
         HolidayCalendar holidays,
         decimal overtimeThresholdHours = DefaultOvertimeThresholdHours,
-        bool timeOffCountsTowardOvertime = true)
+        bool timeOffCountsTowardOvertime = true,
+        DateOnly? scheduleEffectiveFrom = null)
     {
-        Schedule = schedule;
+        ChangeSchedule(schedule, scheduleEffectiveFrom);
         SetPayoutDayOfMonth(payoutDayOfMonth);
         SetOvertimeThresholdHours(overtimeThresholdHours);
         TimeOffCountsTowardOvertime = timeOffCountsTowardOvertime;
@@ -45,6 +48,12 @@ public sealed class PayrollSettings
         new HolidayCalendar());
 
     public PayPeriodSchedule Schedule { get; private set; }
+
+    /// <summary>
+    /// The Sunday the current schedule took effect, or null if it has always applied. Days before it are
+    /// in pay periods that were locked under an earlier schedule.
+    /// </summary>
+    public DateOnly? ScheduleEffectiveFrom { get; private set; }
 
     /// <summary>The day of the month (1–28) payouts happen on.</summary>
     public int PayoutDayOfMonth { get; private set; }
@@ -80,7 +89,32 @@ public sealed class PayrollSettings
         return candidate > period.End ? candidate : candidate.AddMonths(1);
     }
 
-    public void ChangeSchedule(PayPeriodSchedule schedule) => Schedule = schedule;
+    /// <summary>
+    /// The pay period containing <paramref name="date"/> under the current schedule. The first period after
+    /// a schedule change is trimmed so it starts on <see cref="ScheduleEffectiveFrom"/>.
+    /// </summary>
+    public PayPeriod PeriodContaining(DateOnly date)
+    {
+        if (date < ScheduleEffectiveFrom)
+            throw new DomainException($"{date:yyyy-MM-dd} is in a pay period locked under an earlier schedule.");
+
+        var period = Schedule.PeriodContaining(date);
+        if (ScheduleEffectiveFrom is { } start && period.Start < start)
+            return new PayPeriod(new WorkWeek(start), (period.End.DayNumber - start.DayNumber + 1) / 7);
+        return period;
+    }
+
+    /// <param name="effectiveFrom">
+    /// The Sunday the new schedule starts, which is the day after the last locked pay period; null if no period is locked.
+    /// </param>
+    [MemberNotNull(nameof(Schedule))]
+    public void ChangeSchedule(PayPeriodSchedule schedule, DateOnly? effectiveFrom)
+    {
+        if (effectiveFrom is { } sunday)
+            _ = new WorkWeek(sunday); // throws unless it is a Sunday
+        Schedule = schedule;
+        ScheduleEffectiveFrom = effectiveFrom;
+    }
 
     public void SetPayoutDayOfMonth(int day)
     {
