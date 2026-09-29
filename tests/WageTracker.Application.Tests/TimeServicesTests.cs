@@ -23,6 +23,19 @@ public class TimeServicesTests
     }
 
     [Fact]
+    public async Task Hours_worked_count_only_the_part_of_an_entry_inside_the_dates()
+    {
+        var app = new TestApp();
+        var ada = await app.AddHourlyAsync();
+        var saturday10pm = Sunday.AddDays(6).ToDateTime(new TimeOnly(22, 0));
+        await app.TimeEntryService.RecordAsync(ada.Id, Monday8, Monday8.AddHours(8));
+        await app.TimeEntryService.RecordAsync(ada.Id, saturday10pm, saturday10pm.AddHours(4));
+
+        Assert.Equal(10m, await app.TimeEntryService.HoursWorkedAsync(ada.Id, Sunday, Sunday.AddDays(6)));
+        Assert.Equal(2m, await app.TimeEntryService.HoursWorkedAsync(ada.Id, Sunday.AddDays(7), Sunday.AddDays(13)));
+    }
+
+    [Fact]
     public async Task Overlaps_are_checked_against_saved_entries()
     {
         var app = new TestApp();

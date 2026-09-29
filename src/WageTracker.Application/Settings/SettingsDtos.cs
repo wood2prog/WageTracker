@@ -17,6 +17,30 @@ public sealed record ScheduleInput(PayFrequency Frequency, DateOnly? BiWeeklyAnc
     };
 }
 
+/// <summary>The general page of settings, saved together so a bad value leaves nothing half-changed.</summary>
+/// <param name="CompanyName">Blank clears the name.</param>
+/// <param name="CompanyLogo">The contents of a PNG or JPEG file of at most 2 MB, or null for no logo.</param>
+public sealed record GeneralSettingsInput(
+    ScheduleInput Schedule,
+    int PayoutDayOfMonth,
+    decimal OvertimeThresholdHours,
+    bool TimeOffCountsTowardOvertime,
+    string? CompanyName,
+    byte[]? CompanyLogo,
+    int BackupsToKeep)
+{
+    /// <summary>Applies everything except the schedule, which needs the effective date.</summary>
+    internal void ApplyTo(PayrollSettings settings)
+    {
+        settings.SetPayoutDayOfMonth(PayoutDayOfMonth);
+        settings.SetOvertimeThresholdHours(OvertimeThresholdHours);
+        settings.TimeOffCountsTowardOvertime = TimeOffCountsTowardOvertime;
+        settings.SetCompanyName(CompanyName);
+        settings.SetCompanyLogo(CompanyLogo);
+        settings.SetBackupsToKeep(BackupsToKeep);
+    }
+}
+
 public sealed record TimeOffTypeDto(Guid Id, string Name, decimal DefaultHoursPerDay, TimeOffKind Kind, bool IsArchived)
 {
     internal static TimeOffTypeDto From(TimeOffType t) => new(t.Id, t.Name, t.DefaultHoursPerDay, t.Kind, t.IsArchived);

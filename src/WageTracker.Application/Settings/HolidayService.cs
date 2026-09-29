@@ -15,6 +15,12 @@ public sealed class HolidayService(IPayrollSettingsRepository settings)
             .Select(h => new ObservedHolidayDto(h.HolidayId, h.Name, h.Date))
             .ToList();
 
+    /// <summary>Each holiday with the date it is credited for <paramref name="year"/>: the observed date if set, otherwise the rule's date.</summary>
+    public async Task<IReadOnlyList<ObservedHolidayDto>> ListForYearAsync(int year) =>
+        (await settings.RequireAsync()).Holidays.Holidays
+            .Select(h => new ObservedHolidayDto(h.Id, h.Name, h.DateIn(year)))
+            .ToList();
+
     public Task<IReadOnlyList<CompanyHolidayDto>> AddAsync(string name, HolidayRuleDto rule) =>
         ChangeAsync(c => c.Add(name, rule.ToRule()));
 

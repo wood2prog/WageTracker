@@ -22,6 +22,31 @@ public sealed class SettingsService(IPayrollSettingsRepository settings, IPayrol
         return PayrollSettingsDto.From(created);
     }
 
+    /// <summary>First-time setup from the whole general page, with the default Holiday, Vacation, and Sick types.</summary>
+    public async Task<PayrollSettingsDto> InitializeAsync(GeneralSettingsInput input)
+    {
+        if (await settings.GetAsync() is not null)
+            throw new DomainException("Payroll settings are already set up.");
+        var created = PayrollSettings.CreateDefault(input.Schedule.ToSchedule(), input.PayoutDayOfMonth);
+        input.ApplyTo(created);
+        await settings.SaveAsync(created);
+        return PayrollSettingsDto.From(created);
+    }
+
+    /// <summary>
+    /// Saves the whole general page at once. The schedule is changed only if it differs from the current one, since a
+    /// change takes effect after the last locked pay period.
+    /// </summary>
+    public async Task<PayrollSettingsDto> SaveGeneralAsync(GeneralSettingsInput input)
+    {
+        var current = await settings.RequireAsync();
+        if (current.Schedule.Frequency != input.Schedule.Frequency || current.Schedule.Anchor != ScheduleAnchor(input.Schedule))
+            current.ChangeSchedule(input.Schedule.ToSchedule(), (await runs.GetLatestLockedAsync())?.Period.End.AddDays(1));
+        input.ApplyTo(current);
+        await settings.SaveAsync(current);
+        return PayrollSettingsDto.From(current);
+    }
+
     /// <summary>The new schedule takes effect the day after the last locked pay period, so locked periods keep their dates.</summary>
     public async Task<PayrollSettingsDto> ChangeScheduleAsync(ScheduleInput schedule)
     {
@@ -63,6 +88,9 @@ public sealed class SettingsService(IPayrollSettingsRepository settings, IPayrol
 
     public Task<PayrollSettingsDto> RestoreTimeOffTypeAsync(Guid id) =>
         ChangeAsync(s => s.RestoreTimeOffType(id));
+
+    private static DateOnly? ScheduleAnchor(ScheduleInput schedule) =>
+        schedule.Frequency == PayFrequency.BiWeekly ? schedule.BiWeeklyAnchor : null;
 
     private async Task<PayrollSettingsDto> ChangeAsync(Action<PayrollSettings> change) =>
         PayrollSettingsDto.From(await settings.ChangeAsync(change));

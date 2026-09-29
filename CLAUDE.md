@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-The domain, application, and infrastructure layers exist; the WinForms UI does not yet. Requirements come from [Specs.txt](Specs.txt). When you add projects or commands, update this file to match.
+All four layers exist: domain, application, infrastructure, and the WinForms UI. Requirements come from [Specs.txt](Specs.txt). When you add projects or commands, update this file to match.
 
 ## Build and test
 
@@ -13,6 +13,7 @@ The domain, application, and infrastructure layers exist; the WinForms UI does n
 - Build: `dotnet build`
 - Test: `dotnet test`
 - One test: `dotnet test --filter "FullyQualifiedName~PayPeriodScheduleTests"`
+- Run the app: `dotnet run --project src/WageTracker.WinForms`. It uses the real database under `%LOCALAPPDATA%` and writes a backup to Documents when it closes.
 
 Layout:
 
@@ -28,9 +29,16 @@ Layout:
   - The QuestPDF report writer (Community license).
   - `SqliteDatabaseBackup`, which makes the backups.
   - `AddWageTrackerInfrastructure()`, which registers them.
+- `src/WageTracker.WinForms` (`net10.0-windows`, assembly `WageTracker.exe`) is the composition root and references Application and Infrastructure. It contains:
+  - `Program`: wires DI, opens `SettingsForm` in first-time-setup mode when `SettingsService.IsConfiguredAsync()` is false (and exits if setup is closed unsaved), runs `MainForm`, then calls `BackupService.BackupAsync()` on exit.
+  - `MainForm`: a File menu (Settings, open reports/backups folders) and tabs for `EmployeesView`, `TimeView` (one employee's work week), and `PayrollView` (preview, finalize, re-export). Each tab implements `IView` and reloads when selected.
+  - `Settings/SettingsForm`: the General tab is edited and saved as a whole through `SaveGeneralAsync`/`InitializeAsync(GeneralSettingsInput)`. Time-off types and holidays save on each change.
+  - Forms are laid out in code, not the designer, using the helpers in `Common/Build.cs`. Dialogs derive from `DialogForm`, whose OK button runs `SaveAsync` and stays open if it throws. Wrap service calls in `Ui.RunAsync`, which shows the message for the expected exceptions (plus the UI's own `InputException`). All message boxes go through `Ui.MessageBoxShow` so tests can record them.
+  - Hours can be typed as `7.5` or `7:30`. `Formats.TryParseHours` converts them to decimal hours before they reach a service.
+  - Watch the `System.Windows.Forms.Application` vs. `WageTracker.Application` namespace clash; alias it as `WinFormsApp`.
 - `StorageOptions` sets the storage locations. The database defaults to `%LOCALAPPDATA%\WageTracker\wagetracker.db`, outside OneDrive. Reports default to `Documents\WageTracker Reports`, and backups to `Documents\WageTracker Backups`.
 - **Schema**: migrations live in `Persistence/Schema.cs` and run automatically on first connection, tracked with `PRAGMA user_version`. Never edit a shipped migration; append a new one. Decimals are stored as invariant text so rates and money stay exact. Dates are `yyyy-MM-dd`, and date-times are local `yyyy-MM-ddTHH:mm:ss.fffffff`.
-- Tests use xUnit. Application tests use the in-memory fakes in `tests/WageTracker.Application.Tests/Fakes.cs`. Infrastructure tests use a temp-folder database (`TempDatabase`) and include end-to-end tests that wire the real DI container.
+- Tests use xUnit. Application tests use the in-memory fakes in `tests/WageTracker.Application.Tests/Fakes.cs`. Infrastructure tests use a temp-folder database (`TempDatabase`) and include end-to-end tests that wire the real DI container. `tests/WageTracker.WinForms.Tests` has smoke tests that open the real forms on an STA thread against a temp database and pump messages until the async loads finish.
 - Business rule violations throw `DomainException`. A missing record throws `NotFoundException`, and missing settings throw `SettingsNotConfiguredException`. The UI shows the message for all three.
 
 ## Purpose

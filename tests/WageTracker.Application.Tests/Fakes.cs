@@ -65,9 +65,11 @@ internal sealed class InMemorySettings : IPayrollSettingsRepository
 {
     public PayrollSettings? Current { get; set; }
 
+    public int SaveCount { get; private set; }
+
     public Task<PayrollSettings?> GetAsync() => Task.FromResult(Current);
 
-    public Task SaveAsync(PayrollSettings settings) { Current = settings; return Task.CompletedTask; }
+    public Task SaveAsync(PayrollSettings settings) { Current = settings; SaveCount++; return Task.CompletedTask; }
 }
 
 internal sealed class InMemoryRuns : IPayrollRunRepository

@@ -22,6 +22,17 @@ public sealed class TimeEntryService(
             .Select(TimeEntryDto.From)
             .ToList();
 
+    /// <summary>
+    /// Hours the employee worked from <paramref name="from"/> through <paramref name="to"/>. An entry that crosses either
+    /// edge counts only its part inside.
+    /// </summary>
+    public async Task<decimal> HoursWorkedAsync(Guid employeeId, DateOnly from, DateOnly to)
+    {
+        var start = from.ToDateTime(TimeOnly.MinValue);
+        var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        return (await entries.ListForEmployeeAsync(employeeId, start, end)).Sum(e => e.HoursWithin(start, end));
+    }
+
     public async Task<TimeEntryDto> RecordAsync(Guid employeeId, DateTime start, DateTime end)
     {
         var employee = await employees.RequireAsync(employeeId);

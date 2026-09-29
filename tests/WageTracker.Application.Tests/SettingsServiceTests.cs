@@ -113,4 +113,68 @@ public class SettingsServiceTests
         Assert.Equal([new DateOnly(2026, 12, 25), new DateOnly(2027, 12, 24)], observed.Select(h => h.Date));
         Assert.Equal(HolidayRuleKind.FixedDate, (await app.HolidayService.ListAsync()).Single().Rule.Kind);
     }
+
+    [Fact]
+    public async Task First_time_setup_can_save_the_whole_general_page()
+    {
+        var app = new TestApp();
+        app.Settings.Current = null;
+
+        var settings = await app.SettingsService.InitializeAsync(General(new ScheduleInput(PayFrequency.Monthly)) with { CompanyName = "Acme" });
+
+        Assert.Equal(PayFrequency.Monthly, settings.Frequency);
+        Assert.Equal(37.5m, settings.OvertimeThresholdHours);
+        Assert.Equal("Acme", settings.CompanyName);
+        Assert.Equal(3, settings.TimeOffTypes.Count);
+    }
+
+    [Fact]
+    public async Task A_bad_general_value_saves_nothing()
+    {
+        var app = new TestApp();
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            app.SettingsService.SaveGeneralAsync(General(new ScheduleInput(PayFrequency.Monthly)) with { BackupsToKeep = 0 }));
+
+        Assert.Equal(0, app.Settings.SaveCount);
+    }
+
+    [Fact]
+    public async Task Saving_the_general_page_keeps_an_unchanged_schedule()
+    {
+        var app = new TestApp();
+        app.CurrentSettings.ChangeSchedule(PayPeriodSchedule.Weekly(), TestApp.Sunday);
+
+        var settings = await app.SettingsService.SaveGeneralAsync(General(new ScheduleInput(PayFrequency.Weekly)));
+
+        Assert.Equal(TestApp.Sunday, settings.ScheduleEffectiveFrom);
+        Assert.Equal(37.5m, settings.OvertimeThresholdHours);
+    }
+
+    [Fact]
+    public async Task A_changed_schedule_takes_effect_after_the_last_locked_period()
+    {
+        var app = new TestApp();
+        await app.PayrollService.FinalizeAsync(TestApp.Sunday);
+
+        var settings = await app.SettingsService.SaveGeneralAsync(General(new ScheduleInput(PayFrequency.BiWeekly, TestApp.Sunday.AddDays(7))));
+
+        Assert.Equal(PayFrequency.BiWeekly, settings.Frequency);
+        Assert.Equal(TestApp.Sunday.AddDays(7), settings.ScheduleEffectiveFrom);
+    }
+
+    [Fact]
+    public async Task Holidays_are_listed_with_their_date_for_a_year()
+    {
+        var app = new TestApp();
+        var holidays = await app.HolidayService.AddAsync("Christmas", new HolidayRuleDto(HolidayRuleKind.FixedDate, 12, Day: 25));
+        await app.HolidayService.SetObservedDateAsync(holidays.Single().Id, 2027, new DateOnly(2027, 12, 24));
+
+        Assert.Equal(new DateOnly(2026, 12, 25), (await app.HolidayService.ListForYearAsync(2026)).Single().Date);
+        Assert.Equal(new DateOnly(2027, 12, 24), (await app.HolidayService.ListForYearAsync(2027)).Single().Date);
+    }
+
+    private static GeneralSettingsInput General(ScheduleInput schedule) =>
+        new(schedule, PayoutDayOfMonth: 10, OvertimeThresholdHours: 37.5m, TimeOffCountsTowardOvertime: true,
+            CompanyName: null, CompanyLogo: null, BackupsToKeep: 10);
 }

@@ -3,10 +3,12 @@
     <Project Path="src/WageTracker.Application/WageTracker.Application.csproj" />
     <Project Path="src/WageTracker.Domain/WageTracker.Domain.csproj" />
     <Project Path="src/WageTracker.Infrastructure/WageTracker.Infrastructure.csproj" />
+    <Project Path="src/WageTracker.WinForms/WageTracker.WinForms.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WageTracker.Application.Tests/WageTracker.Application.Tests.csproj" />
     <Project Path="tests/WageTracker.Domain.Tests/WageTracker.Domain.Tests.csproj" />
     <Project Path="tests/WageTracker.Infrastructure.Tests/WageTracker.Infrastructure.Tests.csproj" />
+    <Project Path="tests/WageTracker.WinForms.Tests/WageTracker.WinForms.Tests.csproj" />
   </Folder>
 </Solution>
