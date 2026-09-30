@@ -3,11 +3,15 @@ namespace WageTracker.WinForms.Common;
 /// <summary>A form laid out in code at 96 DPI and scaled to the screen.</summary>
 internal class AppForm : Form
 {
+    /// <summary>The app icon, embedded in the assembly so every form's title bar and taskbar button show it.</summary>
+    private static readonly Icon AppIcon = new(typeof(AppForm).Assembly.GetManifestResourceStream("WageTracker.ico")!);
+
     public AppForm()
     {
         AutoScaleDimensions = new SizeF(96F, 96F);
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterParent;
+        Icon = AppIcon;
     }
 }
 

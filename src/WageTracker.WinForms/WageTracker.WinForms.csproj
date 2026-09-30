@@ -22,6 +22,11 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>WageTracker</AssemblyName>
     <RootNamespace>WageTracker.WinForms</RootNamespace>
+    <ApplicationIcon>Resources\WageTracker.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\WageTracker.ico" LogicalName="WageTracker.ico" />
+  </ItemGroup>
 
 </Project>
