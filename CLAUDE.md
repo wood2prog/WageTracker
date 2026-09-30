@@ -14,6 +14,7 @@ All four layers exist: domain, application, infrastructure, and the WinForms UI.
 - Test: `dotnet test`
 - One test: `dotnet test --filter "FullyQualifiedName~PayPeriodScheduleTests"`
 - Run the app: `dotnet run --project src/WageTracker.WinForms`. It uses the real database under `%LOCALAPPDATA%` and writes a backup to Documents when it closes.
+- Build the installer: `dotnet build installer -c Release` produces `installer\bin\Release\WageTracker.msi`.
 
 Layout:
 
@@ -37,6 +38,10 @@ Layout:
   - Hours can be typed as `7.5` or `7:30`. `Formats.TryParseHours` converts them to decimal hours before they reach a service.
   - `Resources/WageTracker.png` is the source logo. `WageTracker.ico` is made from it (16–256 px) and serves as both the exe icon and, embedded, the icon `AppForm` gives every form.
   - Watch the `System.Windows.Forms.Application` vs. `WageTracker.Application` namespace clash; alias it as `WinFormsApp`.
+- `installer/` is a WiX 6 SDK project (`WageTracker.Installer.wixproj` and `Package.wxs`) and isn't in the solution.
+  - Before building, it publishes the WinForms app self-contained for win-x64 into `%TEMP%\WageTracker.Installer\publish`. The staging folder is kept outside OneDrive because sync placeholders block its cleanup.
+  - The MSI installs per machine to Program Files, with Start menu and desktop shortcuts and a WixUI_InstallDir UI that has no license page.
+  - The package version comes from `WageTracker.exe`, so bump `<Version>` in the WinForms csproj for each release. Never change the `UpgradeCode`.
 - `StorageOptions` sets the storage locations. The database defaults to `%LOCALAPPDATA%\WageTracker\wagetracker.db`, outside OneDrive. Reports default to `Documents\WageTracker Reports`, and backups to `Documents\WageTracker Backups`.
 - **Schema**: migrations live in `Persistence/Schema.cs` and run automatically on first connection, tracked with `PRAGMA user_version`. Never edit a shipped migration; append a new one. Decimals are stored as invariant text so rates and money stay exact. Dates are `yyyy-MM-dd`, and date-times are local `yyyy-MM-ddTHH:mm:ss.fffffff`.
 - Tests use xUnit. Application tests use the in-memory fakes in `tests/WageTracker.Application.Tests/Fakes.cs`. Infrastructure tests use a temp-folder database (`TempDatabase`) and include end-to-end tests that wire the real DI container. `tests/WageTracker.WinForms.Tests` has smoke tests that open the real forms on an STA thread against a temp database and pump messages until the async loads finish.

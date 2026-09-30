@@ -23,6 +23,8 @@
     <AssemblyName>WageTracker</AssemblyName>
     <RootNamespace>WageTracker.WinForms</RootNamespace>
     <ApplicationIcon>Resources\WageTracker.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>WageTracker</Product>
   </PropertyGroup>
 
   <ItemGroup>

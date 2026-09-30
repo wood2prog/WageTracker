@@ -1,0 +1,76 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <!--
+    The version comes from WageTracker.exe (<Version> in WageTracker.WinForms.csproj). Raise it
+    for each release: MSI upgrades compare only the first three parts. Never change UpgradeCode,
+    or new versions will install beside old ones instead of replacing them.
+    Uninstalling removes only the program files. The database, reports, and backups stay.
+  -->
+  <Package Name="WageTracker"
+           Manufacturer="WageTracker"
+           Version="!(bind.FileVersion.WageTrackerExe)"
+           UpgradeCode="7da0438d-f4be-4894-b2c9-aa4e9b73e007"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of WageTracker is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="WageTracker.ico" SourceFile="$(IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="WageTracker.ico" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="WageTracker" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component>
+        <File Id="WageTrackerExe" Source="$(PublishDir)WageTracker.exe" KeyPath="yes" />
+      </Component>
+      <Files Include="$(PublishDir)**">
+        <Exclude Files="$(PublishDir)WageTracker.exe" />
+        <Exclude Files="$(PublishDir)*.pdb" />
+      </Files>
+    </ComponentGroup>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Name="WageTracker"
+                  Description="Track employee time and wages"
+                  Target="[INSTALLFOLDER]WageTracker.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="WageTracker.ico" />
+        <RegistryValue Root="HKCU" Key="Software\WageTracker" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Condition="INSTALLDESKTOPSHORTCUT">
+        <Shortcut Name="WageTracker"
+                  Description="Track employee time and wages"
+                  Target="[INSTALLFOLDER]WageTracker.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="WageTracker.ico" />
+        <RegistryValue Root="HKCU" Key="Software\WageTracker" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <!-- On by default. Skip it with: msiexec /i WageTracker.msi INSTALLDESKTOPSHORTCUT="" -->
+    <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" />
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- Welcome, choose folder, install. There's no license page. -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UI>
+      <ui:WixUI Id="WixUI_InstallDir" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" />
+    </UI>
+
+  </Package>
+</Wix>

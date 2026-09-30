@@ -4,14 +4,15 @@
 
 A Windows desktop app for tracking employee time and wages. It records hours worked and paid time off, calculates each pay period's payroll (including overtime, holidays, and vacation payouts), and produces a PDF report for your payroll accountant.
 
-## Requirements
+## Installing
 
-- Windows 10 or 11
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+Build `WageTracker.msi` as described under [For developers](#for-developers), then run it and follow the steps. It installs WageTracker in `Program Files` and adds Start menu and desktop shortcuts. The installer includes everything WageTracker needs, so .NET doesn't have to be installed. It needs Windows 10 or 11 (64-bit) and administrator rights.
 
-## Running it
+To upgrade, run the newer `WageTracker.msi`. It replaces the old version. Uninstalling (Settings > Apps) removes only the program. Your database, reports, and backups are kept.
 
-From the repository folder:
+## Running from source
+
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download). From the repository folder:
 
 ```
 dotnet run --project src/WageTracker.WinForms
@@ -87,6 +88,7 @@ The reports and backups folders can be opened from the **File** menu.
 
 - Build: `dotnet build`
 - Test: `dotnet test`
+- Build the installer: `dotnet build installer -c Release`. This publishes a self-contained copy of the app and writes `installer\bin\Release\WageTracker.msi`. Before releasing, raise `<Version>` in `src/WageTracker.WinForms/WageTracker.WinForms.csproj`, because upgrades compare the first three parts of the version.
 
 The solution (`WageTracker.slnx`) is layered, and each layer depends only on the ones beneath it:
 

@@ -1,0 +1,33 @@
+<Project Sdk="WixToolset.Sdk/6.0.1">
+
+  <!--
+    Builds the Windows installer (MSI). Not part of WageTracker.slnx, so `dotnet build` of the
+    solution doesn't publish the app. Build it with:
+      dotnet build installer -c Release
+    The MSI lands in installer\bin\Release\WageTracker.msi.
+  -->
+
+  <PropertyGroup>
+    <OutputName>WageTracker</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <!-- ICE60 flags versioned native DLLs without a language; harmless. -->
+    <SuppressIces>ICE60</SuppressIces>
+    <AppProject>..\src\WageTracker.WinForms\WageTracker.WinForms.csproj</AppProject>
+    <!-- Staged in %TEMP%: under OneDrive the folders become sync placeholders that can't be cleaned up. -->
+    <AppPublishDir>$([System.IO.Path]::GetTempPath())WageTracker.Installer\publish\</AppPublishDir>
+    <DefineConstants>PublishDir=$(AppPublishDir);IconPath=..\src\WageTracker.WinForms\Resources\WageTracker.ico</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.1" />
+  </ItemGroup>
+
+  <!-- Self-contained, so the PC doesn't need the .NET runtime installed. -->
+  <Target Name="PublishApp" BeforeTargets="BeforeBuild">
+    <RemoveDir Directories="$(AppPublishDir)" />
+    <MSBuild Projects="$(AppProject)"
+             Targets="Restore;Publish"
+             Properties="Configuration=Release;RuntimeIdentifier=win-x64;SelfContained=true;PublishDir=$(AppPublishDir);MSBuildRestoreSessionId=$([System.Guid]::NewGuid())" />
+  </Target>
+
+</Project>
