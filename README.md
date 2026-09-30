@@ -1,4 +1,6 @@
-# WageTracker
+<p align="center">
+  <img src="docs/header.png" alt="WageTracker" width="640">
+</p>
 
 A Windows desktop app for tracking employee time and wages. It records hours worked and paid time off, calculates each pay period's payroll (including overtime, holidays, and vacation payouts), and produces a PDF report for your payroll accountant.
 
