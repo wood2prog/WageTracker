@@ -129,5 +129,16 @@ internal static class Schema
         ALTER TABLE settings ADD COLUMN company_logo BLOB NULL;
         ALTER TABLE settings ADD COLUMN backups_to_keep INTEGER NOT NULL DEFAULT 10;
         """,
+
+        """
+        ALTER TABLE employees ADD COLUMN time_recording TEXT NOT NULL DEFAULT 'Daily';
+
+        CREATE TABLE weekly_hours (
+            employee_id TEXT NOT NULL REFERENCES employees (id),
+            week_start  TEXT NOT NULL,
+            hours       TEXT NOT NULL,
+            PRIMARY KEY (employee_id, week_start)
+        );
+        """,
     ];
 }

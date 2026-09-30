@@ -32,6 +32,19 @@ public interface ITimeEntryRepository
     Task RemoveAsync(Guid id);
 }
 
+public interface IWeeklyHoursRepository
+{
+    Task<WeeklyHours?> GetAsync(Guid employeeId, DateOnly weekStart);
+
+    /// <summary>The employee's weekly totals for weeks starting from <paramref name="from"/> through <paramref name="to"/>, inclusive.</summary>
+    Task<IReadOnlyList<WeeklyHours>> ListForEmployeeAsync(Guid employeeId, DateOnly from, DateOnly to);
+
+    /// <summary>Adds the total, or replaces the employee's total for the same week.</summary>
+    Task SaveAsync(WeeklyHours hours);
+
+    Task RemoveAsync(Guid employeeId, DateOnly weekStart);
+}
+
 public interface ITimeOffRepository
 {
     Task<CompensatedTimeOff?> GetAsync(Guid id);

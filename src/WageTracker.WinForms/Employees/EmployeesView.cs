@@ -22,6 +22,7 @@ internal sealed class EmployeesView : UserControl, IView
             .Column("Status", nameof(EmployeeRow.Status), 80)
             .Column("Pay", nameof(EmployeeRow.Pay), 130, right: true)
             .Column("Overtime", nameof(EmployeeRow.Overtime), 90)
+            .Column("Hours entered", nameof(EmployeeRow.HoursEntered), 90)
             .Column("Hired", nameof(EmployeeRow.Hired), 100)
             .Column("Last day", nameof(EmployeeRow.Ended), 100)
             .Column($"Vacation {DateTime.Today.Year}", nameof(EmployeeRow.Vacation), 120);
@@ -86,7 +87,8 @@ internal sealed class EmployeesView : UserControl, IView
     }
 
     private sealed record EmployeeRow(
-        EmployeeDto Employee, string Name, string Status, string Pay, string Overtime, string Hired, string Ended, string Vacation)
+        EmployeeDto Employee, string Name, string Status, string Pay, string Overtime, string HoursEntered, string Hired, string Ended,
+        string Vacation)
     {
         public static EmployeeRow From(EmployeeDto e, VacationBalanceDto vacation) => new(
             e,
@@ -96,6 +98,7 @@ internal sealed class EmployeesView : UserControl, IView
                 ? $"{Formats.Money(e.CompensationAmount)} / hour"
                 : $"{Formats.Money(e.CompensationAmount)} / year",
             e.OvertimeEligible ? $"+{e.OvertimePercentage:0.##}%" : "Not eligible",
+            e.TimeRecording == TimeRecording.Weekly ? "Weekly" : "Daily",
             Formats.ShortDate(e.HireDate),
             e.EndDate is { } end ? Formats.ShortDate(end) : "",
             e.EmploymentType == EmploymentType.FullTime ? $"{vacation.Used} of {vacation.Permitted} used" : "—");

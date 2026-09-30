@@ -1,3 +1,4 @@
+using WageTracker.Domain.Calendar;
 using WageTracker.Domain.Employees;
 using WageTracker.Domain.Payroll;
 using WageTracker.Domain.TimeOff;
@@ -39,7 +40,7 @@ public sealed class RepositoryTests : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
 
-        Assert.Equal(2L, command.ExecuteScalar());
+        Assert.Equal(3L, command.ExecuteScalar());
         Assert.True(File.Exists(_db.Options.DatabasePath));
     }
 
@@ -50,6 +51,7 @@ public sealed class RepositoryTests : IDisposable
         var employee = await SavedEmployeeAsync(Compensation.Salary(61_500m, overtimeEligible: true));
         employee.ChangeEmploymentDates(employee.HireDate, new DateOnly(2026, 12, 18));
         employee.TimeOffHours.Set(settings.VacationType.Id, 7.5m);
+        employee.ChangeTimeRecording(TimeRecording.Weekly);
         await Employees.UpdateAsync(employee);
 
         var loaded = await Employees.GetAsync(employee.Id);
@@ -61,6 +63,25 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(Compensation.Salary(61_500m, overtimeEligible: true), loaded.Compensation);
         Assert.Equal(1.5m, loaded.OvertimeMultiplier);
         Assert.Equal(7.5m, loaded.TimeOffHours.HoursFor(settings.VacationType.Id));
+        Assert.Equal(TimeRecording.Weekly, loaded.TimeRecording);
+    }
+
+    [Fact]
+    public async Task Weekly_totals_are_saved_replaced_listed_and_removed()
+    {
+        var employee = await SavedEmployeeAsync();
+        var repo = new SqliteWeeklyHoursRepository(_db.Factory);
+        var week = new WorkWeek(Sunday);
+        await repo.SaveAsync(new WeeklyHours(employee.Id, week, 40m));
+        await repo.SaveAsync(new WeeklyHours(employee.Id, week, 42.25m));
+        await repo.SaveAsync(new WeeklyHours(employee.Id, week.Next(), 38m));
+
+        Assert.Equal(42.25m, (await repo.GetAsync(employee.Id, Sunday))!.Hours);
+        Assert.Equal([Sunday, Sunday.AddDays(7)], (await repo.ListForEmployeeAsync(employee.Id, Sunday, Sunday.AddDays(7))).Select(w => w.Week.Start));
+        Assert.Single(await repo.ListForEmployeeAsync(employee.Id, Sunday.AddDays(1), Sunday.AddDays(13)));
+
+        await repo.RemoveAsync(employee.Id, Sunday);
+        Assert.Null(await repo.GetAsync(employee.Id, Sunday));
     }
 
     [Fact]

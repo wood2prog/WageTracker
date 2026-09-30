@@ -30,6 +30,7 @@ public sealed class EmployeeService(
             input.ToCompensation(),
             input.OvertimePercentage,
             input.VacationDaysPermitted);
+        employee.ChangeTimeRecording(input.TimeRecording);
         await employees.AddAsync(employee);
         return EmployeeDto.From(employee);
     }
@@ -44,6 +45,7 @@ public sealed class EmployeeService(
         employee.ChangeCompensation(input.ToCompensation());
         employee.SetOvertimePercentage(input.OvertimePercentage);
         employee.SetVacationDaysPermitted(input.VacationDaysPermitted);
+        employee.ChangeTimeRecording(input.TimeRecording);
         await employees.UpdateAsync(employee);
         return EmployeeDto.From(employee);
     }

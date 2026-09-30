@@ -93,6 +93,42 @@ public sealed class SmokeTests : IDisposable
         });
     }
 
+    [Fact]
+    public void Weekly_hours_are_entered_as_one_total_on_the_time_tab()
+    {
+        using var services = BuildServices();
+        var lastWeek = WorkWeek.Containing(DateOnly.FromDateTime(DateTime.Today)).Previous();
+        var ada = Wait(async () =>
+        {
+            await services.GetRequiredService<SettingsService>().InitializeAsync(new ScheduleInput(PayFrequency.Weekly), 10);
+            return await services.GetRequiredService<EmployeeService>().CreateAsync(new EmployeeInput(
+                "Ada", "Lovelace", new DateOnly(1990, 12, 10), new DateOnly(2020, 1, 6), null,
+                EmploymentType.FullTime, CompensationType.Hourly, 20m, false, 50m, 10, TimeRecording.Weekly));
+        });
+
+        RunSta(() =>
+        {
+            using var form = services.GetRequiredService<MainForm>();
+            form.Show();
+            var tabs = Find<TabControl>(form);
+            tabs.SelectedIndex = 1;
+            var page = tabs.TabPages[1];
+            PumpUntil(() => Find<ComboBox>(page).SelectedItem is not null);
+            Find<Button>(page, b => b.Text.Contains("Previous week")).PerformClick();
+            PumpUntil(() => Find<Label>(page, l => l.Text.StartsWith("Not entered yet")).Visible);
+
+            Assert.False(Grids(page)[0].Visible);
+            Find<TextBox>(page).Text = "41:30";
+            Find<Button>(page, b => b.Text == "Save hours").PerformClick();
+            PumpUntil(() => Descendants(page).OfType<Label>().Any(l => l.Text.Contains("Worked 41.50 h")));
+
+            form.Close();
+        });
+
+        var saved = Wait(() => services.GetRequiredService<TimeEntryService>().GetWeeklyHoursAsync(ada.Id, lastWeek.Start));
+        Assert.Equal(41.5m, saved?.Hours);
+    }
+
     private ServiceProvider BuildServices() => new ServiceCollection()
         .AddWageTrackerApplication()
         .AddWageTrackerInfrastructure(o =>

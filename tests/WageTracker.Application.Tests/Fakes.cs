@@ -46,6 +46,22 @@ internal sealed class InMemoryTimeEntries : ITimeEntryRepository
     public Task RemoveAsync(Guid id) { Items.Remove(id); return Task.CompletedTask; }
 }
 
+internal sealed class InMemoryWeeklyHours : IWeeklyHoursRepository
+{
+    public Dictionary<(Guid EmployeeId, DateOnly WeekStart), WeeklyHours> Items { get; } = [];
+
+    public Task<WeeklyHours?> GetAsync(Guid employeeId, DateOnly weekStart) =>
+        Task.FromResult(Items.GetValueOrDefault((employeeId, weekStart)));
+
+    public Task<IReadOnlyList<WeeklyHours>> ListForEmployeeAsync(Guid employeeId, DateOnly from, DateOnly to) =>
+        Task.FromResult<IReadOnlyList<WeeklyHours>>(
+            Items.Values.Where(w => w.EmployeeId == employeeId && w.Week.Start >= from && w.Week.Start <= to).ToList());
+
+    public Task SaveAsync(WeeklyHours hours) { Items[(hours.EmployeeId, hours.Week.Start)] = hours; return Task.CompletedTask; }
+
+    public Task RemoveAsync(Guid employeeId, DateOnly weekStart) { Items.Remove((employeeId, weekStart)); return Task.CompletedTask; }
+}
+
 internal sealed class InMemoryTimeOff : ITimeOffRepository
 {
     public Dictionary<Guid, CompensatedTimeOff> Items { get; } = [];
@@ -129,6 +145,7 @@ internal sealed class TestApp
     public FakeClock Clock { get; }
     public InMemoryEmployees Employees { get; } = new();
     public InMemoryTimeEntries TimeEntries { get; } = new();
+    public InMemoryWeeklyHours WeeklyHours { get; } = new();
     public InMemoryTimeOff TimeOff { get; } = new();
     public InMemorySettings Settings { get; } = new();
     public InMemoryRuns Runs { get; } = new();
@@ -138,17 +155,19 @@ internal sealed class TestApp
     public BackupService BackupService => new(Settings, Backup, Clock);
 
     public EmployeeService EmployeeService => new(Employees, TimeOff, Settings);
-    public TimeEntryService TimeEntryService => new(TimeEntries, Employees, Runs, Clock);
+    public TimeEntryService TimeEntryService => new(TimeEntries, WeeklyHours, Employees, Runs, Clock);
     public TimeOffService TimeOffService => new(TimeOff, Employees, Settings, Runs);
     public SettingsService SettingsService => new(Settings, Runs);
     public HolidayService HolidayService => new(Settings);
-    public PayrollService PayrollService => new(Employees, TimeEntries, TimeOff, Settings, Runs, Reports, Clock);
+    public PayrollService PayrollService => new(Employees, TimeEntries, WeeklyHours, TimeOff, Settings, Runs, Reports, Clock);
 
     public PayrollSettings CurrentSettings => Settings.Current!;
 
-    public Task<EmployeeDto> AddHourlyAsync(decimal rate = 20m, EmploymentType type = EmploymentType.FullTime) =>
+    public Task<EmployeeDto> AddHourlyAsync(
+        decimal rate = 20m, EmploymentType type = EmploymentType.FullTime, TimeRecording recording = TimeRecording.Daily) =>
         EmployeeService.CreateAsync(new EmployeeInput(
-            "Ada", "Lovelace", new DateOnly(1990, 12, 10), new DateOnly(2020, 1, 1), null, type, CompensationType.Hourly, rate, false, 50m, 10));
+            "Ada", "Lovelace", new DateOnly(1990, 12, 10), new DateOnly(2020, 1, 1), null, type, CompensationType.Hourly, rate, false, 50m, 10,
+            recording));
 
     public Task<EmployeeDto> AddSalariedAsync(decimal annual = 52_000m, bool overtimeEligible = true) =>
         EmployeeService.CreateAsync(new EmployeeInput(

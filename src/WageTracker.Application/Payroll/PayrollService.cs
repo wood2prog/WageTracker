@@ -9,6 +9,7 @@ namespace WageTracker.Application.Payroll;
 public sealed class PayrollService(
     IEmployeeRepository employees,
     ITimeEntryRepository timeEntries,
+    IWeeklyHoursRepository weeklyTotals,
     ITimeOffRepository timeOff,
     IPayrollSettingsRepository settings,
     IPayrollRunRepository runs,
@@ -87,9 +88,10 @@ public sealed class PayrollService(
     private async Task<PayStatement> CalculateAsync(Employee employee, PayPeriod period, PayrollSettings current, PayStatement? previous)
     {
         var entries = await timeEntries.ListForEmployeeAsync(employee.Id, period.StartsAt, period.EndsAt);
+        var totals = await weeklyTotals.ListForEmployeeAsync(employee.Id, period.Start, period.End);
         // From January 1 so the vacation payout can count the days used that year.
         var daysOff = await timeOff.ListForEmployeeAsync(employee.Id, new DateOnly(period.Start.Year, 1, 1), period.End);
-        return PayStatement.Calculate(employee, period, current, entries, daysOff, previous);
+        return PayStatement.Calculate(employee, period, current, entries, daysOff, previous, totals);
     }
 
     /// <summary>

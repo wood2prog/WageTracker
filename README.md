@@ -35,13 +35,14 @@ Everything can be changed later from **File > Settings**.
 
 ### Employees tab
 
-Add and edit employees: name, birth date, hire date, last day (for someone who has left), full-time or part-time, hourly rate or annual salary, overtime premium, and vacation days per year. **Time-off hours...** sets an employee's own hours per day for each type of time off. Types left blank use the default from settings.
+Add and edit employees: name, birth date, hire date, last day (for someone who has left), full-time or part-time, hourly rate or annual salary, overtime premium, vacation days per year, and whether hours are entered **daily** (each shift's start and end) or **weekly** (one total per week, such as from a timesheet). **Time-off hours...** sets an employee's own hours per day for each type of time off. Types left blank use the default from settings.
 
 ### Time tab
 
 Pick an employee and a week. Weeks run Sunday through Saturday.
 
-- **Time worked**: add, edit, or delete entries with a start and end date and time. An entry can be at most 24 hours long, can't end in the future, and can't overlap another entry.
+- **Time worked**: for employees entered daily, add, edit, or delete entries with a start and end date and time. An entry can be at most 24 hours long, can't end in the future, and can't overlap another entry.
+  For employees entered weekly, type the week's total hours (such as `40` or `38:30`) and click **Save hours** or press Enter. **Clear** removes it. The week must have started, and a week can have either entries or a total, not both.
 - **Days off**: book whole days of vacation, sick time, or other types you've added. Company holidays are credited automatically, so you never book them.
 
 The header shows the week's hours, any company holidays, and how much vacation the employee has left this year.

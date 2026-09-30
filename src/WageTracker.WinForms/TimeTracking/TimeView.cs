@@ -9,7 +9,10 @@ using WageTracker.WinForms.Common;
 
 namespace WageTracker.WinForms.TimeTracking;
 
-/// <summary>One employee's time entries and days off for one work week (Sunday through Saturday).</summary>
+/// <summary>
+/// One employee's hours and days off for one work week (Sunday through Saturday). Hours are time entries, or one
+/// weekly total for employees whose hours are entered weekly.
+/// </summary>
 internal sealed class TimeView : UserControl, IView
 {
     private readonly EmployeeService _employees;
@@ -22,6 +25,10 @@ internal sealed class TimeView : UserControl, IView
     private readonly DateTimePicker _weekOf = Build.DatePicker();
     private readonly Label _summary = Build.Text(bold: true);
     private readonly Label _details = Build.Text();
+    private readonly TextBox _weeklyHours = new() { Width = 80, TextAlign = HorizontalAlignment.Right };
+    private readonly Label _weeklyStatus = Build.Text();
+    private readonly FlowLayoutPanel _weeklyBar;
+    private readonly FlowLayoutPanel _dailyBar;
     private readonly DataGridView _entries;
     private readonly DataGridView _daysOff;
 
@@ -48,16 +55,30 @@ internal sealed class TimeView : UserControl, IView
             .Column("Hours", nameof(EntryRow.Hours), 70, right: true);
         _entries.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OnEditEntry(this, EventArgs.Empty); };
 
+        _weeklyHours.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode != Keys.Enter)
+                return;
+            e.SuppressKeyPress = true;
+            OnSaveWeeklyHours(this, EventArgs.Empty);
+        };
+        _weeklyBar = Build.Bar(
+            Build.Text("Hours worked this week"), _weeklyHours,
+            Build.Button("Save hours", OnSaveWeeklyHours),
+            Build.Button("Clear", OnClearWeeklyHours),
+            _weeklyStatus);
+        _dailyBar = Build.Bar(
+            Build.Button("Add entry...", OnAddEntry),
+            Build.Button("Edit...", OnEditEntry),
+            Build.Button("Delete", OnDeleteEntry));
+
         _daysOff = Build.Grid()
             .Column("Day", nameof(DayOffRow.Day), 120)
             .Column("Type", nameof(DayOffRow.Type), 120)
             .Column("Hours", nameof(DayOffRow.Hours), 70, right: true);
 
         var split = Build.Split(
-            Build.Group("Time worked", Build.Bar(
-                Build.Button("Add entry...", OnAddEntry),
-                Build.Button("Edit...", OnEditEntry),
-                Build.Button("Delete", OnDeleteEntry)), _entries),
+            Build.Group("Time worked", _weeklyBar, _dailyBar, _entries),
             Build.Group("Days off", Build.Bar(
                 Build.Button("Book day off...", OnBookDayOff),
                 Build.Button("Cancel day off", OnCancelDayOff)), _daysOff),
@@ -118,6 +139,7 @@ internal sealed class TimeView : UserControl, IView
 
         if (Employee is not { } employee)
         {
+            ShowTimeRecording(weekly: false, hasEntries: false);
             _entries.Bind(Array.Empty<EntryRow>());
             _daysOff.Bind(Array.Empty<DayOffRow>());
             _summary.Text = $"Week of {Formats.Range(_week.Start, _week.End)}";
@@ -130,6 +152,17 @@ internal sealed class TimeView : UserControl, IView
         var daysOff = await _timeOff.ListAsync(employee.Id, _week.Start, _week.End);
         _entries.Bind(entries.Select(EntryRow.From).ToList(), r => r.Entry.Id == selectedEntry);
         _daysOff.Bind(daysOff.Select(DayOffRow.From).ToList());
+
+        var weekly = employee.TimeRecording == TimeRecording.Weekly;
+        ShowTimeRecording(weekly, entries.Count > 0);
+        if (weekly)
+        {
+            var total = await _timeEntries.GetWeeklyHoursAsync(employee.Id, _week.Start);
+            _weeklyHours.Text = total is null ? "" : Formats.Hours(total.Hours);
+            _weeklyStatus.Text = entries.Count > 0
+                ? "This week has time entries from daily entry. Delete them to enter a weekly total."
+                : total is null ? "Not entered yet. Type the total, such as 40 or 38:30, and press Enter." : "Saved.";
+        }
 
         // An entry that crosses Saturday midnight counts partly toward each week.
         var worked = await _timeEntries.HoursWorkedAsync(employee.Id, _week.Start, _week.End);
@@ -145,6 +178,41 @@ internal sealed class TimeView : UserControl, IView
         {
             _details.Text = "Part-time: paid for hours worked only." + holidayText;
         }
+    }
+
+    /// <summary>
+    /// Shows the weekly total for employees whose hours are entered weekly, and the time entries for everyone else.
+    /// Entries recorded before an employee switched to weekly stay visible so they can be deleted.
+    /// </summary>
+    private void ShowTimeRecording(bool weekly, bool hasEntries)
+    {
+        _weeklyBar.Visible = weekly;
+        _dailyBar.Visible = _entries.Visible = !weekly || hasEntries;
+    }
+
+    private async void OnSaveWeeklyHours(object? sender, EventArgs e)
+    {
+        if (Employee is not { } employee)
+            return;
+        await Ui.RunAsync(this, async () =>
+        {
+            var hours = Formats.RequireHours(_weeklyHours.Text, "weekly total");
+            await _timeEntries.SetWeeklyHoursAsync(employee.Id, _week.Start, hours);
+            await LoadWeekAsync();
+        });
+    }
+
+    private async void OnClearWeeklyHours(object? sender, EventArgs e)
+    {
+        if (Employee is not { } employee)
+            return;
+        if (!Ui.Confirm(this, $"Clear {employee.FullName}'s hours for the week of {Formats.Range(_week.Start, _week.End)}?"))
+            return;
+        await Ui.RunAsync(this, async () =>
+        {
+            await _timeEntries.ClearWeeklyHoursAsync(employee.Id, _week.Start);
+            await LoadWeekAsync();
+        });
     }
 
     private async void OnAddEntry(object? sender, EventArgs e)

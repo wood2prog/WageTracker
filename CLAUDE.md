@@ -17,7 +17,7 @@ All four layers exist: domain, application, infrastructure, and the WinForms UI.
 
 Layout:
 
-- `src/WageTracker.Domain` has no dependencies and targets `net10.0`. Folders: `Calendar` (WorkWeek), `Employees`, `TimeTracking` (TimeEntry), `TimeOff`, `Payroll` (schedules, `PayrollSettings`, `PayStatement` calculation, and `PayrollRun` locking).
+- `src/WageTracker.Domain` has no dependencies and targets `net10.0`. Folders: `Calendar` (WorkWeek), `Employees`, `TimeTracking` (TimeEntry, WeeklyHours), `TimeOff`, `Payroll` (schedules, `PayrollSettings`, `PayStatement` calculation, and `PayrollRun` locking).
 - `src/WageTracker.Application` references only Domain. It contains:
   - `Abstractions`: the ports Infrastructure implements. These are the repositories (in `Repositories.cs`), `IPayrollReportWriter`, and `IClock`.
   - One use-case service per area: `EmployeeService`, `TimeEntryService`, `TimeOffService`, `SettingsService`, `HolidayService`, and `PayrollService`.
@@ -31,7 +31,7 @@ Layout:
   - `AddWageTrackerInfrastructure()`, which registers them.
 - `src/WageTracker.WinForms` (`net10.0-windows`, assembly `WageTracker.exe`) is the composition root and references Application and Infrastructure. It contains:
   - `Program`: wires DI, opens `SettingsForm` in first-time-setup mode when `SettingsService.IsConfiguredAsync()` is false (and exits if setup is closed unsaved), runs `MainForm`, then calls `BackupService.BackupAsync()` on exit.
-  - `MainForm`: a File menu (Settings, open reports/backups folders) and tabs for `EmployeesView`, `TimeView` (one employee's work week), and `PayrollView` (preview, finalize, re-export). Each tab implements `IView` and reloads when selected.
+  - `MainForm`: a File menu (Settings, open reports/backups folders) and tabs for `EmployeesView`, `TimeView` (one employee's work week: time entries, or the weekly total for weekly employees), and `PayrollView` (preview, finalize, re-export). Each tab implements `IView` and reloads when selected.
   - `Settings/SettingsForm`: the General tab is edited and saved as a whole through `SaveGeneralAsync`/`InitializeAsync(GeneralSettingsInput)`. Time-off types and holidays save on each change.
   - Forms are laid out in code, not the designer, using the helpers in `Common/Build.cs`. Dialogs derive from `DialogForm`, whose OK button runs `SaveAsync` and stays open if it throws. Wrap service calls in `Ui.RunAsync`, which shows the message for the expected exceptions (plus the UI's own `InputException`). All message boxes go through `Ui.MessageBoxShow` so tests can record them.
   - Hours can be typed as `7.5` or `7:30`. `Formats.TryParseHours` converts them to decimal hours before they reach a service.
@@ -59,6 +59,12 @@ Domain entities named in the spec: `Employee`, `TimeEntry`, `CompensatedTimeOff`
 ## Domain rules from the spec
 
 - **TimeEntry**: a start date/time and an end date/time. An entry can't last longer than 24 hours, can't end in the future, and can't overlap another entry for the same employee. Back-to-back entries are allowed. New entries go through `TimeEntry.Record`.
+- **Daily or weekly hours**: each employee's `TimeRecording` says how hours worked are entered.
+  - `Daily`: time entries with a start and end.
+  - `Weekly`: one `WeeklyHours` total per work week, going through `WeeklyHours.Record`. The week must have started, and the total must be more than 0 and at most 24 hours for each day employed that week.
+  - New time entries require `Daily`, and new weekly totals require `Weekly`. Switching keeps what was already entered, and it is still paid.
+  - A week can't have both time entries and a weekly total. A week's worked hours are its entries plus its total.
+  - `TimeEntryService` handles both.
 - **Hours and money**: the model stores both as decimals with two decimal places (0.00). The UI may accept hour:minute input, but it converts that to decimal hours before it reaches the model.
 - **Work week**: the spec says "Saturday midnight to Saturday midnight," which means **Sunday 00:00 up to, but not including, the next Sunday 00:00**. Sunday is the first day of the week and Saturday is the last.
 - **Pay period**: the user picks one week, two weeks, or one month. Pay periods are built from whole weeks. For the monthly option, **a week belongs to the month its Sunday falls in**. The monthly period runs from the first Sunday of the month through the Saturday after the last Sunday of the month, so it can end in the next month. Any days before the month's first Sunday belong to the previous month's period. Example: September 2026 runs Sun Sept 6 – Sat Oct 3, and Sept 1–5 fall in August's period.

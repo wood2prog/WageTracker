@@ -68,7 +68,7 @@ public sealed class PayStatement(
 
     /// <summary>
     /// Calculates the statement. Overtime is figured week by week, and a time entry that crosses a
-    /// week boundary is split between the two weeks.
+    /// week boundary is split between the two weeks. A week's worked hours are its time entries plus its weekly total.
     /// </summary>
     /// <param name="timeOff">
     /// The employee's time off from January 1 of the period's first year through the end of the period,
@@ -78,23 +78,27 @@ public sealed class PayStatement(
     /// The employee's statement for the period just before this one, if there is one. Salaried overtime
     /// it deferred is paid in this statement.
     /// </param>
+    /// <param name="weeklyTotals">The employee's weekly totals, for weeks whose hours were entered as one total.</param>
     public static PayStatement Calculate(
         Employee employee,
         PayPeriod period,
         PayrollSettings settings,
         IEnumerable<TimeEntry> timeEntries,
         IEnumerable<CompensatedTimeOff> timeOff,
-        PayStatement? previous)
+        PayStatement? previous,
+        IEnumerable<WeeklyHours>? weeklyTotals = null)
     {
         var entries = timeEntries.ToList();
         var daysOff = timeOff.ToList();
-        if (entries.Any(e => e.EmployeeId != employee.Id) || daysOff.Any(t => t.EmployeeId != employee.Id))
-            throw new DomainException("All time entries and time off must belong to the employee being paid.");
+        var totals = weeklyTotals?.ToList() ?? [];
+        if (entries.Any(e => e.EmployeeId != employee.Id) || daysOff.Any(t => t.EmployeeId != employee.Id)
+            || totals.Any(w => w.EmployeeId != employee.Id))
+            throw new DomainException("All time entries, weekly totals, and time off must belong to the employee being paid.");
         if (previous is not null && (previous.EmployeeId != employee.Id || previous.Period.End.AddDays(1) != period.Start))
             throw new DomainException("The previous statement must be this employee's statement for the period just before.");
 
         var weeks = period.Weeks
-            .Select(week => SummarizeWeek(week, employee, entries, daysOff, settings))
+            .Select(week => SummarizeWeek(week, employee, entries, totals, daysOff, settings))
             .ToList();
 
         var compensation = employee.Compensation;
@@ -142,10 +146,12 @@ public sealed class PayStatement(
         WorkWeek week,
         Employee employee,
         List<TimeEntry> entries,
+        List<WeeklyHours> weeklyTotals,
         List<CompensatedTimeOff> daysOff,
         PayrollSettings settings)
     {
-        var worked = entries.Sum(e => e.HoursWithin(week.StartsAt, week.EndsAt));
+        var worked = entries.Sum(e => e.HoursWithin(week.StartsAt, week.EndsAt))
+            + weeklyTotals.Where(w => w.Week == week).Sum(w => w.Hours);
         var bookedHours = daysOff
             .Where(t => week.Contains(t.Date))
             .Sum(t => employee.ResolveTimeOffHours(settings.GetTimeOffType(t.TimeOffTypeId)));

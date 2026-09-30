@@ -32,8 +32,8 @@ public class EmploymentDatesTests
         var employee = Hourly(hired: Wednesday);
         var tuesday = Sunday.AddDays(2).ToDateTime(new TimeOnly(8, 0));
 
-        Assert.Throws<DomainException>(() => TimeEntry.Record(employee, tuesday, tuesday.AddHours(8), [], Now));
-        TimeEntry.Record(employee, tuesday.AddDays(1), tuesday.AddDays(1).AddHours(8), [], Now);
+        Assert.Throws<DomainException>(() => TimeEntry.Record(employee, tuesday, tuesday.AddHours(8), [], [], Now));
+        TimeEntry.Record(employee, tuesday.AddDays(1), tuesday.AddDays(1).AddHours(8), [], [], Now);
     }
 
     [Fact]
@@ -42,8 +42,8 @@ public class EmploymentDatesTests
         var employee = Hourly(ended: Wednesday);
         var evening = Wednesday.ToDateTime(new TimeOnly(16, 0));
 
-        TimeEntry.Record(employee, evening, evening.AddHours(8), [], Now);
-        Assert.Throws<DomainException>(() => TimeEntry.Record(employee, evening, evening.AddHours(9), [], Now));
+        TimeEntry.Record(employee, evening, evening.AddHours(8), [], [], Now);
+        Assert.Throws<DomainException>(() => TimeEntry.Record(employee, evening, evening.AddHours(9), [], [], Now));
     }
 
     [Fact]

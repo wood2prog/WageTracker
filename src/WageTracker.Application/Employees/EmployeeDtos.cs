@@ -6,6 +6,7 @@ namespace WageTracker.Application.Employees;
 /// <param name="EndDate">The last day worked, or null while still employed.</param>
 /// <param name="CompensationAmount">The hourly rate, or the annual salary.</param>
 /// <param name="SalariedOvertimeEligible">Ignored for hourly employees, who always earn overtime.</param>
+/// <param name="TimeRecording">Whether hours are entered each day or as one total per week.</param>
 public sealed record EmployeeInput(
     string FirstName,
     string LastName,
@@ -17,7 +18,8 @@ public sealed record EmployeeInput(
     decimal CompensationAmount,
     bool SalariedOvertimeEligible,
     decimal OvertimePercentage,
-    int VacationDaysPermitted)
+    int VacationDaysPermitted,
+    TimeRecording TimeRecording = TimeRecording.Daily)
 {
     internal Compensation ToCompensation() => CompensationType == CompensationType.Salary
         ? Compensation.Salary(CompensationAmount, SalariedOvertimeEligible)
@@ -39,6 +41,7 @@ public sealed record EmployeeDto(
     bool OvertimeEligible,
     decimal OvertimePercentage,
     int VacationDaysPermitted,
+    TimeRecording TimeRecording,
     IReadOnlyDictionary<Guid, decimal> TimeOffHoursOverrides)
 {
     internal static EmployeeDto From(Employee e) => new(
@@ -55,6 +58,7 @@ public sealed record EmployeeDto(
         e.Compensation.OvertimeEligible,
         e.OvertimePercentage,
         e.VacationDaysPermitted,
+        e.TimeRecording,
         new Dictionary<Guid, decimal>(e.TimeOffHours.Entries));
 }
 

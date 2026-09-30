@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddSingleton<SqliteConnectionFactory>();
         services.AddSingleton<IEmployeeRepository, SqliteEmployeeRepository>();
         services.AddSingleton<ITimeEntryRepository, SqliteTimeEntryRepository>();
+        services.AddSingleton<IWeeklyHoursRepository, SqliteWeeklyHoursRepository>();
         services.AddSingleton<ITimeOffRepository, SqliteTimeOffRepository>();
         services.AddSingleton<IPayrollSettingsRepository, SqlitePayrollSettingsRepository>();
         services.AddSingleton<IPayrollRunRepository, SqlitePayrollRunRepository>();

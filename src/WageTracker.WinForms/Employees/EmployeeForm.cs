@@ -20,6 +20,7 @@ internal sealed class EmployeeForm : DialogForm
     private readonly CheckBox _overtimeEligible = new() { Text = "Eligible for overtime", AutoSize = true };
     private readonly NumericUpDown _overtimePercentage = Build.Number(0, 1000, places: 2);
     private readonly NumericUpDown _vacationDays = Build.Number(0, 366);
+    private readonly ComboBox _timeRecording = Build.DropDown(220);
 
     /// <param name="existing">The employee to edit, or null to add one.</param>
     /// <param name="save">Saves the input through the employee service.</param>
@@ -31,6 +32,9 @@ internal sealed class EmployeeForm : DialogForm
         _employmentType.SetChoices([new("Full-time", EmploymentType.FullTime), new Choice<EmploymentType>("Part-time", EmploymentType.PartTime)]);
         _compensationType.SetChoices([new("Hourly", CompensationType.Hourly), new Choice<CompensationType>("Salary", CompensationType.Salary)]);
         _compensationType.SelectedIndexChanged += (_, _) => ShowCompensationType();
+        _timeRecording.SetChoices([
+            new("Daily (start and end times)", TimeRecording.Daily),
+            new Choice<TimeRecording>("Weekly (one total per week)", TimeRecording.Weekly)]);
         _endDate.ShowCheckBox = true;
 
         Field("First name", _firstName);
@@ -47,6 +51,8 @@ internal sealed class EmployeeForm : DialogForm
         Field("Overtime premium (%)", _overtimePercentage);
         Note("The premium on top of the regular rate. 50 means overtime pays 1.5 times the rate.");
         Field("Vacation days per year", _vacationDays);
+        Field("Enter hours", _timeRecording);
+        Note("Daily: record each shift's start and end. Weekly: enter the total hours worked each week, such as from a timesheet.");
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         if (existing is null)
@@ -59,6 +65,7 @@ internal sealed class EmployeeForm : DialogForm
             _compensationType.Select(CompensationType.Hourly);
             _overtimePercentage.Value = 50;
             _vacationDays.Value = 10;
+            _timeRecording.Select(TimeRecording.Daily);
         }
         else
         {
@@ -74,6 +81,7 @@ internal sealed class EmployeeForm : DialogForm
             _overtimeEligible.Checked = existing.OvertimeEligible;
             _overtimePercentage.Value = existing.OvertimePercentage;
             _vacationDays.Value = existing.VacationDaysPermitted;
+            _timeRecording.Select(existing.TimeRecording);
         }
         ShowCompensationType();
     }
@@ -89,7 +97,8 @@ internal sealed class EmployeeForm : DialogForm
         _amount.Value,
         _overtimeEligible.Checked,
         _overtimePercentage.Value,
-        (int)_vacationDays.Value));
+        (int)_vacationDays.Value,
+        _timeRecording.SelectedValue<TimeRecording>()));
 
     /// <summary>Hourly employees always earn overtime; salaried employees only when marked eligible.</summary>
     private void ShowCompensationType()

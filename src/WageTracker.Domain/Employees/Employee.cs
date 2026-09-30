@@ -77,6 +77,9 @@ public sealed class Employee
     /// </summary>
     public TimeOffHoursTable TimeOffHours { get; } = new();
 
+    /// <summary>Whether hours worked are entered as time entries each day, or as one total per week.</summary>
+    public TimeRecording TimeRecording { get; private set; } = TimeRecording.Daily;
+
     /// <summary>Only full-time employees get compensated time off (holidays, vacation, and the like).</summary>
     public bool GetsCompensatedTimeOff => EmploymentType == EmploymentType.FullTime;
 
@@ -125,6 +128,9 @@ public sealed class Employee
     public void ChangeEmploymentType(EmploymentType employmentType) => EmploymentType = employmentType;
 
     public void ChangeCompensation(Compensation compensation) => Compensation = compensation;
+
+    /// <summary>Hours already entered the other way are kept and still paid.</summary>
+    public void ChangeTimeRecording(TimeRecording timeRecording) => TimeRecording = timeRecording;
 
     public void SetOvertimePercentage(decimal percentage)
     {

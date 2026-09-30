@@ -30,25 +30,32 @@ public sealed class TimeEntry
     public decimal Hours => Rounding.Hours((decimal)(End - Start).TotalHours);
 
     /// <summary>
-    /// Creates a new entry. It must end after it starts, last no more than 24 hours, not end after
-    /// <paramref name="now"/>, fall within the employee's employment, and not overlap their other entries.
+    /// Creates a new entry. The employee's hours must be entered daily. The entry must end after it starts,
+    /// last no more than 24 hours, not end after <paramref name="now"/>, fall within the employee's employment,
+    /// not overlap their other entries, and not fall in a week that has a weekly total.
     /// </summary>
     /// <param name="existingEntries">The employee's entries around this time.</param>
+    /// <param name="weeklyTotals">The employee's weekly totals for the weeks this entry touches.</param>
     public static TimeEntry Record(
-        Employee employee, DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries, DateTime now)
+        Employee employee, DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries,
+        IEnumerable<WeeklyHours> weeklyTotals, DateTime now)
     {
+        if (employee.TimeRecording != TimeRecording.Daily)
+            throw new DomainException($"{employee.FullName}'s hours are entered as a weekly total, not by the day.");
         var entry = new TimeEntry(Guid.NewGuid(), employee.Id, start, end);
-        entry.EnsureFitsAmong(employee, existingEntries, now);
+        entry.EnsureFitsAmong(employee, existingEntries, weeklyTotals, now);
         return entry;
     }
 
-    /// <summary>Moves the entry, applying the same rules as <see cref="Record"/>.</summary>
-    public void Reschedule(Employee employee, DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries, DateTime now)
+    /// <summary>Moves the entry, applying the same rules as <see cref="Record"/> except how hours are entered.</summary>
+    public void Reschedule(
+        Employee employee, DateTime start, DateTime end, IEnumerable<TimeEntry> existingEntries,
+        IEnumerable<WeeklyHours> weeklyTotals, DateTime now)
     {
         if (employee.Id != EmployeeId)
             throw new DomainException("A time entry can only be moved for its own employee.");
         var moved = new TimeEntry(Id, EmployeeId, start, end);
-        moved.EnsureFitsAmong(employee, existingEntries, now);
+        moved.EnsureFitsAmong(employee, existingEntries, weeklyTotals, now);
         (Start, End) = (start, end);
     }
 
@@ -65,7 +72,8 @@ public sealed class TimeEntry
 
     public bool Overlaps(TimeEntry other) => Start < other.End && other.Start < End;
 
-    private void EnsureFitsAmong(Employee employee, IEnumerable<TimeEntry> existingEntries, DateTime now)
+    private void EnsureFitsAmong(
+        Employee employee, IEnumerable<TimeEntry> existingEntries, IEnumerable<WeeklyHours> weeklyTotals, DateTime now)
     {
         if (End > now)
             throw new DomainException("A time entry cannot end in the future.");
@@ -76,6 +84,11 @@ public sealed class TimeEntry
         if (clash is not null)
             throw new DomainException(
                 $"This entry overlaps the entry from {clash.Start:yyyy-MM-dd HH:mm} to {clash.End:yyyy-MM-dd HH:mm}.");
+
+        var total = weeklyTotals.FirstOrDefault(w => w.EmployeeId == EmployeeId && Start < w.Week.EndsAt && w.Week.StartsAt < End);
+        if (total is not null)
+            throw new DomainException(
+                $"The week of {total.Week} already has a weekly total of {total.Hours:0.00} hours. Clear it before adding time entries.");
     }
 
     private static (DateTime, DateTime) ValidateSpan(DateTime start, DateTime end)

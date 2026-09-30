@@ -17,8 +17,10 @@ public sealed class SqliteEmployeeRepository(SqliteConnectionFactory db) : IEmpl
         using var tx = connection.BeginTransaction();
         connection.Execute(tx, """
             INSERT INTO employees (id, first_name, last_name, birth_date, hire_date, end_date, employment_type,
-                compensation_type, compensation_amount, overtime_eligible, overtime_percentage, vacation_days_permitted)
-            VALUES ($id, $first, $last, $birth, $hire, $end, $employment, $compType, $amount, $otEligible, $otPct, $vacation)
+                compensation_type, compensation_amount, overtime_eligible, overtime_percentage, vacation_days_permitted,
+                time_recording)
+            VALUES ($id, $first, $last, $birth, $hire, $end, $employment, $compType, $amount, $otEligible, $otPct, $vacation,
+                $recording)
             """, Parameters(employee));
         SaveTimeOffHours(connection, tx, employee);
         tx.Commit();
@@ -32,7 +34,7 @@ public sealed class SqliteEmployeeRepository(SqliteConnectionFactory db) : IEmpl
             UPDATE employees SET first_name = $first, last_name = $last, birth_date = $birth, hire_date = $hire,
                 end_date = $end, employment_type = $employment, compensation_type = $compType,
                 compensation_amount = $amount, overtime_eligible = $otEligible, overtime_percentage = $otPct,
-                vacation_days_permitted = $vacation
+                vacation_days_permitted = $vacation, time_recording = $recording
             WHERE id = $id
             """, Parameters(employee));
         connection.Execute(tx, "DELETE FROM employee_time_off_hours WHERE employee_id = $id", ("$id", employee.Id));
@@ -65,7 +67,7 @@ public sealed class SqliteEmployeeRepository(SqliteConnectionFactory db) : IEmpl
             ? Compensation.Salary(amount, r.Bool("overtime_eligible"))
             : Compensation.Hourly(amount);
 
-        return new Employee(
+        var employee = new Employee(
             r.Guid("id"),
             r.Text("first_name"),
             r.Text("last_name"),
@@ -76,6 +78,8 @@ public sealed class SqliteEmployeeRepository(SqliteConnectionFactory db) : IEmpl
             compensation,
             r.Decimal("overtime_percentage"),
             r.Int("vacation_days_permitted"));
+        employee.ChangeTimeRecording(r.Enum<TimeRecording>("time_recording"));
+        return employee;
     }
 
     private static (string, object?)[] Parameters(Employee e) =>
@@ -84,7 +88,7 @@ public sealed class SqliteEmployeeRepository(SqliteConnectionFactory db) : IEmpl
         ("$hire", e.HireDate), ("$end", e.EndDate), ("$employment", e.EmploymentType),
         ("$compType", e.Compensation.Type), ("$amount", e.Compensation.Amount),
         ("$otEligible", e.Compensation.OvertimeEligible), ("$otPct", e.OvertimePercentage),
-        ("$vacation", e.VacationDaysPermitted),
+        ("$vacation", e.VacationDaysPermitted), ("$recording", e.TimeRecording),
     ];
 
     private static void SaveTimeOffHours(SqliteConnection connection, SqliteTransaction tx, Employee employee)
