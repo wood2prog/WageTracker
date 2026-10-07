@@ -14,6 +14,8 @@ public sealed record WeekDto(DateOnly Start, DateOnly End, decimal WorkedHours, 
 
 /// <param name="OvertimePay">Overtime paid in this period, including salaried overtime carried from the previous one.</param>
 /// <param name="DeferredOvertimePay">Salaried overtime earned in this period and paid in the next.</param>
+/// <param name="CompensatedRegularHours">The hours the base pay covers; for salary, the equivalent at the hourly rate.</param>
+/// <param name="CompensatedOvertimeHours">Overtime hours that earn overtime pay, whenever it is paid.</param>
 public sealed record PayStatementDto(
     Guid EmployeeId,
     string EmployeeName,
@@ -23,6 +25,8 @@ public sealed record PayStatementDto(
     decimal WorkedHours,
     decimal TimeOffHours,
     decimal OvertimeHours,
+    decimal CompensatedRegularHours,
+    decimal CompensatedOvertimeHours,
     decimal BasePay,
     decimal OvertimePay,
     decimal DeferredOvertimePay,
@@ -31,6 +35,9 @@ public sealed record PayStatementDto(
     decimal GrossPay,
     IReadOnlyList<WeekDto> Weeks)
 {
+    /// <summary>All hours paid for: for salary, the hours the salary covers rather than the hours recorded.</summary>
+    public decimal CompensatedHours => CompensatedRegularHours + CompensatedOvertimeHours;
+
     internal static PayStatementDto From(PayStatement s, string employeeName) => new(
         s.EmployeeId,
         employeeName,
@@ -40,6 +47,8 @@ public sealed record PayStatementDto(
         s.WorkedHours,
         s.TimeOffHours,
         s.OvertimeHours,
+        s.CompensatedRegularHours,
+        s.CompensatedOvertimeHours,
         s.BasePay,
         s.OvertimePay,
         s.DeferredOvertimePay,

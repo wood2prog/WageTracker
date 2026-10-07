@@ -9,7 +9,7 @@ public interface IHoursReportWriter
     /// <returns>Where the report was written, such as a file path, to show the user.</returns>
     Task<string> WriteAsync(PayrollReport report);
 
-    /// <summary>Each employee's compensated hours split into regular and overtime, with the total.</summary>
+    /// <summary>Each employee's hourly rate and compensated hours split into regular and overtime, with the total.</summary>
     /// <returns>Where the report was written, such as a file path, to show the user.</returns>
     Task<string> WriteRegularAndOvertimeAsync(PayrollReport report);
 }

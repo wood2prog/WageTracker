@@ -140,5 +140,13 @@ internal static class Schema
             PRIMARY KEY (employee_id, week_start)
         );
         """,
+
+        // Statements locked before this only knew overtime eligibility through the employee, so take it from there.
+        """
+        ALTER TABLE pay_statements ADD COLUMN overtime_eligible INTEGER NOT NULL DEFAULT 1;
+        UPDATE pay_statements
+        SET overtime_eligible = COALESCE((SELECT e.overtime_eligible FROM employees e WHERE e.id = pay_statements.employee_id), 0)
+        WHERE compensation_type = 'Salary';
+        """,
     ];
 }

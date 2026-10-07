@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using WageTracker.Domain.Calendar;
 using WageTracker.Domain.Employees;
 using WageTracker.Domain.Payroll;
@@ -40,7 +41,7 @@ public sealed class RepositoryTests : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
 
-        Assert.Equal(3L, command.ExecuteScalar());
+        Assert.Equal((long)Schema.Migrations.Length, command.ExecuteScalar());
         Assert.True(File.Exists(_db.Options.DatabasePath));
     }
 
@@ -196,6 +197,52 @@ public sealed class RepositoryTests : IDisposable
     public async Task No_settings_until_saved() => Assert.Null(await Settings.GetAsync());
 
     [Fact]
+    public async Task Locked_statements_keep_salaried_overtime_ineligibility()
+    {
+        var settings = await SavedSettingsAsync();
+        var employee = await SavedEmployeeAsync(Compensation.Salary(52_000m, overtimeEligible: false));
+        var period = settings.PeriodContaining(Sunday);
+        var run = new PayrollRun(period, settings.PayoutDateFor(period));
+        run.Lock([PayStatement.Calculate(employee, period, settings, [], [], null)], new DateTime(2026, 9, 14, 9, 30, 0));
+        var repo = new SqlitePayrollRunRepository(_db.Factory);
+        await repo.AddAsync(run);
+
+        Assert.False((await repo.GetByPeriodStartAsync(Sunday))!.StatementFor(employee.Id)!.OvertimeEligible);
+    }
+
+    [Fact]
+    public async Task Upgrading_takes_locked_salaried_overtime_eligibility_from_the_employee()
+    {
+        Directory.CreateDirectory(_db.Folder);
+        await using (var v3 = new SqliteConnection($"Data Source={_db.Options.DatabasePath};Pooling=False"))
+        {
+            await v3.OpenAsync();
+            using var command = v3.CreateCommand();
+            command.CommandText = string.Join(";", Schema.Migrations[..3]) + """
+                ;
+                PRAGMA user_version = 3;
+                INSERT INTO employees (id, first_name, last_name, birth_date, hire_date, employment_type, compensation_type,
+                    compensation_amount, overtime_eligible, overtime_percentage, vacation_days_permitted)
+                VALUES ('00000000-0000-0000-0000-00000000000a', 'Ada', 'L', '1990-01-01', '2020-01-01', 'FullTime', 'Hourly', '20', 1, '50', 10),
+                       ('00000000-0000-0000-0000-00000000000b', 'Grace', 'H', '1990-01-01', '2020-01-01', 'FullTime', 'Salary', '52000', 0, '50', 10),
+                       ('00000000-0000-0000-0000-00000000000c', 'Alan', 'T', '1990-01-01', '2020-01-01', 'FullTime', 'Salary', '52000', 1, '50', 10);
+                INSERT INTO payroll_runs VALUES ('00000000-0000-0000-0000-000000000001', '2026-09-06', '2026-09-12', 1, '2026-10-10', 'Locked', '2026-09-14T09:00:00.0000000');
+                INSERT INTO pay_statements (run_id, employee_id, compensation_type, hourly_rate, overtime_multiplier, base_pay,
+                    overtime_pay, deferred_overtime_pay, vacation_days_paid_out, vacation_payout)
+                VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Hourly', '20', '1.5', '800', '0', '0', 0, '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Salary', '25', '1.5', '1000', '0', '0', 0, '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000c', 'Salary', '25', '1.5', '1000', '0', '0', 0, '0');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        var run = (await new SqlitePayrollRunRepository(_db.Factory).GetByPeriodStartAsync(Sunday))!;
+
+        Assert.Equal([true, false, true], run.Statements.OrderBy(s => s.EmployeeId).Select(s => s.OvertimeEligible));
+        Assert.Equal(40m, run.Statements.Single(s => s.CompensationType == CompensationType.Salary && !s.OvertimeEligible).CompensatedRegularHours);
+    }
+
+    [Fact]
     public async Task Locked_runs_round_trip_with_exact_statement_values()
     {
         var settings = await SavedSettingsAsync();
@@ -219,6 +266,8 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(statement.DeferredOvertimePay, loadedStatement.DeferredOvertimePay);
         Assert.Equal(statement.GrossPay, loadedStatement.GrossPay);
         Assert.Equal(statement.Weeks, loadedStatement.Weeks);
+        Assert.True(loadedStatement.OvertimeEligible);
+        Assert.Equal(40m, loadedStatement.CompensatedRegularHours);
         Assert.Equal(loaded.Id, (await repo.GetEndingOnAsync(Sunday.AddDays(6)))!.Id);
         Assert.Equal(loaded.Id, (await repo.GetLatestLockedAsync())!.Id);
         Assert.Single(await repo.ListLockedOverlappingAsync(Sunday.AddDays(6), Sunday.AddDays(7)));

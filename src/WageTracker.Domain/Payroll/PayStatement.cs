@@ -18,6 +18,7 @@ public sealed class PayStatement(
     CompensationType compensationType,
     decimal hourlyRate,
     decimal overtimeMultiplier,
+    bool overtimeEligible,
     decimal basePay,
     decimal overtimePay,
     decimal deferredOvertimePay,
@@ -38,6 +39,9 @@ public sealed class PayStatement(
     public decimal HourlyRate { get; } = hourlyRate;
 
     public decimal OvertimeMultiplier { get; } = overtimeMultiplier;
+
+    /// <summary>Whether overtime hours earn overtime pay. Always true for hourly; set on the compensation for salary.</summary>
+    public bool OvertimeEligible { get; } = overtimeEligible;
 
     /// <summary>
     /// Hourly: regular hours (worked and time off) times the rate. Salary: weekly salary ÷ 5 for each weekday employed.
@@ -65,6 +69,23 @@ public sealed class PayStatement(
     public decimal TimeOffHours => Weeks.Sum(w => w.TimeOffHours);
 
     public decimal OvertimeHours => Weeks.Sum(w => w.OvertimeHours);
+
+    /// <summary>
+    /// The hours the base pay covers. Hourly: the regular hours. Salary: the base pay at the hourly rate, so a
+    /// full week counts as the overtime threshold and a partial week a fifth of it per weekday employed,
+    /// whatever hours were recorded.
+    /// </summary>
+    public decimal CompensatedRegularHours => CompensationType == CompensationType.Salary
+        ? HourlyRate == 0m ? 0m : Rounding.Hours(BasePay / HourlyRate)
+        : Weeks.Sum(w => w.RegularHours);
+
+    /// <summary>
+    /// Overtime hours that earn overtime pay: none for salaried employees who are not eligible. Salaried overtime
+    /// counts in the period it is earned, though it is paid in the next.
+    /// </summary>
+    public decimal CompensatedOvertimeHours => OvertimeEligible ? OvertimeHours : 0m;
+
+    public decimal CompensatedHours => CompensatedRegularHours + CompensatedOvertimeHours;
 
     /// <summary>
     /// Calculates the statement. Overtime is figured week by week, and a time entry that crosses a
@@ -135,6 +156,7 @@ public sealed class PayStatement(
             compensation.Type,
             hourlyRate,
             employee.OvertimeMultiplier,
+            compensation.OvertimeEligible,
             Rounding.Money(basePay),
             Rounding.Money(overtimePay),
             Rounding.Money(deferredOvertimePay),

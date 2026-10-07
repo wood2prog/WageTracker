@@ -152,6 +152,49 @@ public class PayStatementTests
     }
 
     [Fact]
+    public void Salaried_employees_are_compensated_for_the_threshold_hours_each_week_without_time_entries()
+    {
+        var statement = Calculate(Salaried(), Settings(PayPeriodSchedule.Monthly()), date: new DateOnly(2026, 9, 15));
+
+        Assert.Equal(0m, statement.WorkedHours);
+        Assert.Equal(160m, statement.CompensatedRegularHours);
+        Assert.Equal(0m, statement.CompensatedOvertimeHours);
+        Assert.Equal(160m, statement.CompensatedHours);
+    }
+
+    [Fact]
+    public void A_salaried_partial_week_is_compensated_a_fifth_of_the_threshold_per_weekday_employed()
+    {
+        // Hired Wednesday: Wednesday, Thursday, and Friday are paid.
+        var statement = Calculate(Salaried(hired: Sunday.AddDays(3)), Settings());
+
+        Assert.Equal(24m, statement.CompensatedRegularHours);
+    }
+
+    [Fact]
+    public void Salaried_overtime_is_compensated_only_when_eligible()
+    {
+        var eligible = Salaried(overtimeEligible: true);
+        var ineligible = Salaried(overtimeEligible: false);
+
+        var paid = Calculate(eligible, Settings(), WorkWeek(eligible, 9m));
+        var unpaid = Calculate(ineligible, Settings(), WorkWeek(ineligible, 9m));
+
+        Assert.Equal((40m, 5m, 45m), (paid.CompensatedRegularHours, paid.CompensatedOvertimeHours, paid.CompensatedHours));
+        Assert.Equal((40m, 0m, 40m), (unpaid.CompensatedRegularHours, unpaid.CompensatedOvertimeHours, unpaid.CompensatedHours));
+    }
+
+    [Fact]
+    public void Hourly_compensated_hours_are_the_regular_and_overtime_hours()
+    {
+        var employee = Hourly();
+
+        var statement = Calculate(employee, Settings(), WorkWeek(employee, 9m));
+
+        Assert.Equal((40m, 5m, 45m), (statement.CompensatedRegularHours, statement.CompensatedOvertimeHours, statement.CompensatedHours));
+    }
+
+    [Fact]
     public void Salaried_overtime_is_paid_in_the_next_period()
     {
         var employee = Salaried(52_000m, overtimeEligible: true);

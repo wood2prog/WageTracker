@@ -37,11 +37,11 @@ public sealed class SqlitePayrollRunRepository(SqliteConnectionFactory db) : IPa
         {
             connection.Execute(tx, """
                 INSERT INTO pay_statements (run_id, employee_id, compensation_type, hourly_rate, overtime_multiplier,
-                    base_pay, overtime_pay, deferred_overtime_pay, vacation_days_paid_out, vacation_payout)
-                VALUES ($run, $e, $type, $rate, $multiplier, $base, $ot, $deferred, $vacationDays, $vacationPay)
+                    overtime_eligible, base_pay, overtime_pay, deferred_overtime_pay, vacation_days_paid_out, vacation_payout)
+                VALUES ($run, $e, $type, $rate, $multiplier, $otEligible, $base, $ot, $deferred, $vacationDays, $vacationPay)
                 """,
                 ("$run", run.Id), ("$e", s.EmployeeId), ("$type", s.CompensationType), ("$rate", s.HourlyRate),
-                ("$multiplier", s.OvertimeMultiplier), ("$base", s.BasePay), ("$ot", s.OvertimePay),
+                ("$multiplier", s.OvertimeMultiplier), ("$otEligible", s.OvertimeEligible), ("$base", s.BasePay), ("$ot", s.OvertimePay),
                 ("$deferred", s.DeferredOvertimePay), ("$vacationDays", s.VacationDaysPaidOut), ("$vacationPay", s.VacationPayout));
 
             foreach (var w in s.Weeks)
@@ -98,6 +98,7 @@ public sealed class SqlitePayrollRunRepository(SqliteConnectionFactory db) : IPa
                 r.Enum<CompensationType>("compensation_type"),
                 r.Decimal("hourly_rate"),
                 r.Decimal("overtime_multiplier"),
+                r.Bool("overtime_eligible"),
                 r.Decimal("base_pay"),
                 r.Decimal("overtime_pay"),
                 r.Decimal("deferred_overtime_pay"),

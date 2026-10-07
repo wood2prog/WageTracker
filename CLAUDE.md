@@ -22,7 +22,7 @@ Layout:
 - `src/WageTracker.Application` references only Domain. It contains:
   - `Abstractions`: the ports Infrastructure implements. These are the repositories (in `Repositories.cs`), `IPayrollReportWriter`, and `IClock`.
   - One use-case service per area: `EmployeeService`, `TimeEntryService`, `TimeOffService`, `SettingsService`, `HolidayService`, and `PayrollService`.
-  - `Reports`: the pay period reports the Payroll tab lists. Each implements `IPeriodReport` (name, whether the period must be finalized, `CreateAsync(date)`) and is registered in `AddWageTrackerApplication()`, in list order. `ReportService` lists them and creates one by name. There are three: `PayrollPeriodReport` re-exports the accountant's report (finalized periods only); `HoursSummaryReport` lists each employee's total compensated hours; and `RegularAndOvertimeHoursReport` splits those hours into regular and overtime. The two hours reports work on open periods as a preview and share `IHoursReportWriter`; the payroll report uses `IPayrollReportWriter`.
+  - `Reports`: the pay period reports the Payroll tab lists. Each implements `IPeriodReport` (name, whether the period must be finalized, `CreateAsync(date)`) and is registered in `AddWageTrackerApplication()`, in list order. `ReportService` lists them and creates one by name. There are three: `PayrollPeriodReport` re-exports the accountant's report (finalized periods only); `HoursSummaryReport` lists each employee's total compensated hours; and `RegularAndOvertimeHoursReport` shows the hourly rate and splits those hours into regular and overtime (no pay amounts). The two hours reports work on open periods as a preview and share `IHoursReportWriter`; the payroll report uses `IPayrollReportWriter`.
   - `AddWageTrackerApplication()`, which registers the services.
 - Services take and return DTO records and never hand domain entities to the UI. Every change goes through a domain method. Before changing a date or time, a service checks it isn't in a locked pay period.
 - Repositories save each write immediately. No use case changes more than one aggregate, so there is no unit of work.
@@ -98,6 +98,7 @@ Domain entities named in the spec: `Employee`, `TimeEntry`, `CompensatedTimeOff`
   - In a leaver's final period (the one containing their end date), unused vacation is paid out, and salaried overtime earned that period is paid then instead of being deferred.
 - **Full-time vs. part-time**: only full-time employees get compensated time off (holidays, vacation, and other types) and the year-end vacation payout. Part-time employees are paid only for hours worked, plus overtime.
 - **Compensation types**: hourly and salary. Salary pays annual ÷ 52 for each week in the period.
+  - **Compensated hours** (`PayStatement.CompensatedRegularHours`/`CompensatedOvertimeHours`), used by the hours reports: for hourly, the regular and overtime hours. For salary, regular is base pay ÷ hourly rate (a full week is the overtime threshold, prorated by weekday), whatever hours were recorded; overtime counts only if eligible, in the period it's earned. Each statement stores `OvertimeEligible` for this.
 - **Overtime**:
   - Overtime is hours over the weekly threshold. The default threshold is 40, and it can be changed in settings.
   - Overtime is figured for each week, never across a whole pay period.
