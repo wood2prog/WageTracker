@@ -1,4 +1,5 @@
 using WageTracker.Application.Payroll;
+using WageTracker.Application.Reports;
 using WageTracker.Domain.Employees;
 using WageTracker.WinForms.Common;
 
@@ -6,18 +7,20 @@ namespace WageTracker.WinForms.Payroll;
 
 /// <summary>
 /// One pay period's payroll: a live preview while the period is open, or the stored statements once it is finalized.
-/// Finalizing locks the period and writes the report for the payroll accountant.
+/// Finalizing locks the period and writes the report for the payroll accountant; other reports are picked from a list.
 /// </summary>
 internal sealed class PayrollView : UserControl, IView
 {
     private readonly PayrollService _payroll;
+    private readonly ReportService _reports;
 
     private readonly DateTimePicker _periodOf = Build.DatePicker();
     private readonly Label _period = Build.Text(bold: true);
     private readonly Label _status = Build.Text();
     private readonly Label _total = Build.Text(bold: true);
     private readonly Button _finalize;
-    private readonly Button _export;
+    private readonly ComboBox _report = Build.DropDown(220);
+    private readonly Button _createReport;
     private readonly DataGridView _statements;
     private readonly DataGridView _weeks;
     private readonly GroupBox _weeksGroup;
@@ -26,15 +29,20 @@ internal sealed class PayrollView : UserControl, IView
     private PayrollRunDto? _run;
     private bool _loading;
 
-    public PayrollView(PayrollService payroll)
+    public PayrollView(PayrollService payroll, ReportService reports)
     {
         _payroll = payroll;
+        _reports = reports;
 
         _periodOf.SetDate(_date);
         _periodOf.ValueChanged += async (_, _) => { if (!_loading) await ShowPeriodAsync(_periodOf.ToDateOnly()); };
 
         _finalize = Build.Button("Finalize and create report...", OnFinalize);
-        _export = Build.Button("Create report again", OnExport);
+        _report.SetChoices(reports.List().Select(r => new Choice<ReportDto>(r.Name, r)));
+        if (_report.Items.Count > 0)
+            _report.SelectedIndex = 0;
+        _report.SelectedIndexChanged += (_, _) => EnableCreateReport();
+        _createReport = Build.Button("Create report", OnCreateReport);
 
         _statements = Build.Grid()
             .Column("Employee", nameof(StatementRow.Employee), 150)
@@ -69,7 +77,7 @@ internal sealed class PayrollView : UserControl, IView
             Build.Button("Next period ▶", async (_, _) => await ShowPeriodAsync((_run?.End ?? _date).AddDays(1)))));
         header.Controls.Add(_period);
         header.Controls.Add(_status);
-        header.Controls.Add(Build.Bar(_finalize, _export));
+        header.Controls.Add(Build.Bar(_finalize, Build.Text("Report"), _report, _createReport));
 
         Controls.Add(split);
         Controls.Add(header);
@@ -87,7 +95,7 @@ internal sealed class PayrollView : UserControl, IView
             : "Not finalized. This is a preview from the current time entries and days off.";
         _status.ForeColor = _run.IsLocked ? SystemColors.ControlText : Color.DarkGoldenrod;
         _finalize.Enabled = !_run.IsLocked;
-        _export.Enabled = _run.IsLocked;
+        EnableCreateReport();
         _total.Text = $"Total gross pay: {Formats.Money(_run.TotalGrossPay)}   ·   {_run.Statements.Count} employee{(_run.Statements.Count == 1 ? "" : "s")}";
 
         _statements.Bind(_run.Statements.Select(StatementRow.From).ToList(), r => r.Statement.EmployeeId == selectedId);
@@ -127,12 +135,17 @@ internal sealed class PayrollView : UserControl, IView
         OfferToOpen(result!.ReportLocation);
     }
 
-    private async void OnExport(object? sender, EventArgs e)
+    /// <summary>Reports that show stored statements can only be created once the period is finalized.</summary>
+    private void EnableCreateReport() =>
+        _createReport.Enabled = _run is { } run && _report.SelectedValue<ReportDto>() is { } report
+            && (run.IsLocked || !report.RequiresFinalizedPeriod);
+
+    private async void OnCreateReport(object? sender, EventArgs e)
     {
-        if (_run is not { } run)
+        if (_run is not { } run || _report.SelectedValue<ReportDto>() is not { } report)
             return;
         string? location = null;
-        if (await Ui.RunAsync(this, async () => location = await _payroll.ExportReportAsync(run.Start)))
+        if (await Ui.RunAsync(this, async () => location = await _reports.CreateAsync(report.Name, run.Start)))
             OfferToOpen(location!);
     }
 

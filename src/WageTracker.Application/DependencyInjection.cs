@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WageTracker.Application.Abstractions;
 using WageTracker.Application.Employees;
 using WageTracker.Application.Payroll;
+using WageTracker.Application.Reports;
 using WageTracker.Application.Settings;
 using WageTracker.Application.TimeOff;
 using WageTracker.Application.TimeTracking;
@@ -24,6 +25,10 @@ public static class DependencyInjection
         services.AddTransient<HolidayService>();
         services.AddTransient<BackupService>();
         services.AddTransient<PayrollService>();
+        services.AddTransient<ReportService>();
+
+        // The pay period reports, in the order the Payroll tab lists them.
+        services.AddTransient<IPeriodReport, PayrollPeriodReport>();
         return services;
     }
 }

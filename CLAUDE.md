@@ -22,6 +22,7 @@ Layout:
 - `src/WageTracker.Application` references only Domain. It contains:
   - `Abstractions`: the ports Infrastructure implements. These are the repositories (in `Repositories.cs`), `IPayrollReportWriter`, and `IClock`.
   - One use-case service per area: `EmployeeService`, `TimeEntryService`, `TimeOffService`, `SettingsService`, `HolidayService`, and `PayrollService`.
+  - `Reports`: the pay period reports the Payroll tab lists. Each implements `IPeriodReport` (name, whether the period must be finalized, `CreateAsync(date)`) and is registered in `AddWageTrackerApplication()`, in list order. `ReportService` lists them and creates one by name. For now there is just `PayrollPeriodReport`, which re-exports the accountant's report.
   - `AddWageTrackerApplication()`, which registers the services.
 - Services take and return DTO records and never hand domain entities to the UI. Every change goes through a domain method. Before changing a date or time, a service checks it isn't in a locked pay period.
 - Repositories save each write immediately. No use case changes more than one aggregate, so there is no unit of work.
@@ -32,7 +33,7 @@ Layout:
   - `AddWageTrackerInfrastructure()`, which registers them.
 - `src/WageTracker.WinForms` (`net10.0-windows`, assembly `WageTracker.exe`) is the composition root and references Application and Infrastructure. It contains:
   - `Program`: wires DI, opens `SettingsForm` in first-time-setup mode when `SettingsService.IsConfiguredAsync()` is false (and exits if setup is closed unsaved), runs `MainForm`, then calls `BackupService.BackupAsync()` on exit.
-  - `MainForm`: a File menu (Settings, open reports/backups folders) and tabs for `EmployeesView`, `TimeView` (one employee's work week: time entries, or the weekly total for weekly employees), and `PayrollView` (preview, finalize, re-export). Each tab implements `IView` and reloads when selected.
+  - `MainForm`: a File menu (Settings, open reports/backups folders) and tabs for `EmployeesView`, `TimeView` (one employee's work week: time entries, or the weekly total for weekly employees), and `PayrollView` (preview, finalize, and a report drop-down with a Create button). Each tab implements `IView` and reloads when selected.
   - `Settings/SettingsForm`: the General tab is edited and saved as a whole through `SaveGeneralAsync`/`InitializeAsync(GeneralSettingsInput)`. Time-off types and holidays save on each change.
   - Forms are laid out in code, not the designer, using the helpers in `Common/Build.cs`. Dialogs derive from `DialogForm`, whose OK button runs `SaveAsync` and stays open if it throws. Wrap service calls in `Ui.RunAsync`, which shows the message for the expected exceptions (plus the UI's own `InputException`). All message boxes go through `Ui.MessageBoxShow` so tests can record them.
   - Hours can be typed as `7.5` or `7:30`. `Formats.TryParseHours` converts them to decimal hours before they reach a service.

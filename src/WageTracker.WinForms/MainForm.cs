@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using WageTracker.Application.Employees;
 using WageTracker.Application.Payroll;
+using WageTracker.Application.Reports;
 using WageTracker.Application.Settings;
 using WageTracker.Application.TimeOff;
 using WageTracker.Application.TimeTracking;
@@ -32,6 +33,7 @@ internal sealed class MainForm : AppForm
         SettingsService settings,
         HolidayService holidays,
         PayrollService payroll,
+        ReportService reports,
         StorageOptions storage)
     {
         _settings = settings;
@@ -45,7 +47,7 @@ internal sealed class MainForm : AppForm
         _tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(12, 4) };
         AddTab("Employees", new EmployeesView(employees, settings));
         AddTab("Time", new TimeView(employees, timeEntries, timeOff, settings, holidays));
-        AddTab("Payroll", new PayrollView(payroll));
+        AddTab("Payroll", new PayrollView(payroll, reports));
         _tabs.SelectedIndexChanged += async (_, _) => await ReloadCurrentAsync();
 
         var file = new ToolStripMenuItem("&File");
