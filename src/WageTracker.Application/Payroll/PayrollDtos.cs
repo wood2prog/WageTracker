@@ -5,6 +5,9 @@ namespace WageTracker.Application.Payroll;
 
 public sealed record WeekDto(DateOnly Start, DateOnly End, decimal WorkedHours, decimal TimeOffHours, decimal RegularHours, decimal OvertimeHours)
 {
+    /// <summary>All hours paid for the week: worked plus time off, or regular plus overtime.</summary>
+    public decimal TotalHours => RegularHours + OvertimeHours;
+
     internal static WeekDto From(WeekSummary w) =>
         new(w.Week.Start, w.Week.End, w.WorkedHours, w.TimeOffHours, w.RegularHours, w.OvertimeHours);
 }

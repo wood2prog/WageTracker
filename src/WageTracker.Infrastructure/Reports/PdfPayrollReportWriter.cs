@@ -10,7 +10,7 @@ namespace WageTracker.Infrastructure.Reports;
 
 /// <summary>
 /// Writes the payroll accountant's report as a PDF: for each employee, the pay lines and a week-by-week
-/// table of hours, followed by totals for the period.
+/// table of hours with a total row, followed by totals for the period.
 /// </summary>
 public sealed class PdfPayrollReportWriter(StorageOptions options) : IPayrollReportWriter
 {
@@ -102,12 +102,12 @@ public sealed class PdfPayrollReportWriter(StorageOptions options) : IPayrollRep
             table.ColumnsDefinition(c =>
             {
                 c.RelativeColumn(3);
-                for (var i = 0; i < 4; i++)
+                for (var i = 0; i < 5; i++)
                     c.RelativeColumn(1);
             });
             table.Header(h =>
             {
-                foreach (var title in new[] { "Week", "Worked", "Time off", "Regular", "Overtime" })
+                foreach (var title in new[] { "Week", "Worked", "Time off", "Regular", "Overtime", "Total hours" })
                     h.Cell().Background(Colors.Grey.Lighten3).Padding(3).Element(c => title == "Week" ? c : c.AlignRight()).Text(title).Bold();
             });
             foreach (var w in s.Weeks)
@@ -117,7 +117,15 @@ public sealed class PdfPayrollReportWriter(StorageOptions options) : IPayrollRep
                 HoursCell(table, w.TimeOffHours);
                 HoursCell(table, w.RegularHours);
                 HoursCell(table, w.OvertimeHours);
+                HoursCell(table, w.TotalHours);
             }
+
+            table.Cell().BorderTop(0.5f).Padding(3).Text("Total").Bold();
+            TotalCell(table, s.Weeks.Sum(w => w.WorkedHours));
+            TotalCell(table, s.Weeks.Sum(w => w.TimeOffHours));
+            TotalCell(table, s.Weeks.Sum(w => w.RegularHours));
+            TotalCell(table, s.Weeks.Sum(w => w.OvertimeHours));
+            TotalCell(table, s.Weeks.Sum(w => w.TotalHours));
         });
     });
 
@@ -152,6 +160,9 @@ public sealed class PdfPayrollReportWriter(StorageOptions options) : IPayrollRep
 
     private static void HoursCell(TableDescriptor table, decimal hours) =>
         table.Cell().Padding(3).AlignRight().Text(Hours(hours));
+
+    private static void TotalCell(TableDescriptor table, decimal hours) =>
+        table.Cell().BorderTop(0.5f).Padding(3).AlignRight().Text(Hours(hours)).Bold();
 
     private static string Money(decimal amount) => amount.ToString("C", Culture);
 
