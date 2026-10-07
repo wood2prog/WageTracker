@@ -22,13 +22,13 @@ Layout:
 - `src/WageTracker.Application` references only Domain. It contains:
   - `Abstractions`: the ports Infrastructure implements. These are the repositories (in `Repositories.cs`), `IPayrollReportWriter`, and `IClock`.
   - One use-case service per area: `EmployeeService`, `TimeEntryService`, `TimeOffService`, `SettingsService`, `HolidayService`, and `PayrollService`.
-  - `Reports`: the pay period reports the Payroll tab lists. Each implements `IPeriodReport` (name, whether the period must be finalized, `CreateAsync(date)`) and is registered in `AddWageTrackerApplication()`, in list order. `ReportService` lists them and creates one by name. For now there is just `PayrollPeriodReport`, which re-exports the accountant's report.
+  - `Reports`: the pay period reports the Payroll tab lists. Each implements `IPeriodReport` (name, whether the period must be finalized, `CreateAsync(date)`) and is registered in `AddWageTrackerApplication()`, in list order. `ReportService` lists them and creates one by name. There are two: `PayrollPeriodReport` re-exports the accountant's report (finalized periods only), and `HoursSummaryReport` lists each employee's total compensated hours (open periods give a preview). Each has its own writer port (`IPayrollReportWriter`, `IHoursReportWriter`).
   - `AddWageTrackerApplication()`, which registers the services.
 - Services take and return DTO records and never hand domain entities to the UI. Every change goes through a domain method. Before changing a date or time, a service checks it isn't in a locked pay period.
 - Repositories save each write immediately. No use case changes more than one aggregate, so there is no unit of work.
 - `src/WageTracker.Infrastructure` references Application. It contains:
   - SQLite repositories written by hand with `Microsoft.Data.Sqlite`. There is no ORM: repositories rebuild domain objects through their public load constructors.
-  - The QuestPDF report writer (Community license).
+  - The QuestPDF report writers (Community license). `PdfLayout` holds the page they share: header with company and logo, period, preview notice, and page numbers.
   - `SqliteDatabaseBackup`, which makes the backups.
   - `AddWageTrackerInfrastructure()`, which registers them.
 - `src/WageTracker.WinForms` (`net10.0-windows`, assembly `WageTracker.exe`) is the composition root and references Application and Infrastructure. It contains:

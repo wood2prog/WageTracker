@@ -13,7 +13,7 @@ public static class DependencyInjection
 {
     /// <summary>
     /// Registers the use-case services and the system clock. Infrastructure registers the repositories,
-    /// the report writer, and the database backup.
+    /// the report writers, and the database backup.
     /// </summary>
     public static IServiceCollection AddWageTrackerApplication(this IServiceCollection services)
     {
@@ -29,6 +29,7 @@ public static class DependencyInjection
 
         // The pay period reports, in the order the Payroll tab lists them.
         services.AddTransient<IPeriodReport, PayrollPeriodReport>();
+        services.AddTransient<IPeriodReport, HoursSummaryReport>();
         return services;
     }
 }

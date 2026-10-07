@@ -1,10 +1,10 @@
-using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using WageTracker.Application.Abstractions;
 using WageTracker.Application.Payroll;
 using WageTracker.Domain.Employees;
+using static WageTracker.Infrastructure.Reports.PdfLayout;
 
 namespace WageTracker.Infrastructure.Reports;
 
@@ -14,59 +14,14 @@ namespace WageTracker.Infrastructure.Reports;
 /// </summary>
 public sealed class PdfPayrollReportWriter(StorageOptions options) : IPayrollReportWriter
 {
-    static PdfPayrollReportWriter() => QuestPDF.Settings.License = LicenseType.Community;
-
-    private static CultureInfo Culture => CultureInfo.CurrentCulture;
-
-    public Task<string> WriteAsync(PayrollReport report)
-    {
-        var run = report.Run;
-        Directory.CreateDirectory(options.ReportsFolder);
-        var path = Path.Combine(options.ReportsFolder, $"Payroll {run.Start:yyyy-MM-dd} to {run.End:yyyy-MM-dd}.pdf");
-        Build(report).GeneratePdf(path);
-        return Task.FromResult(path);
-    }
-
-    private static Document Build(PayrollReport report) => Document.Create(container => container.Page(page =>
-    {
-        var run = report.Run;
-        page.Size(PageSizes.Letter);
-        page.Margin(40);
-        page.DefaultTextStyle(x => x.FontSize(10));
-
-        page.Header().PaddingBottom(10).Row(header =>
-        {
-            if (report.CompanyLogo is { } logo)
-                header.ConstantItem(80).PaddingRight(12).MaxHeight(60).Image(logo).FitArea();
-
-            header.RelativeItem().Column(text =>
-            {
-                if (report.CompanyName is { } company)
-                    text.Item().Text(company).FontSize(14).SemiBold();
-                text.Item().Text("Payroll Report").FontSize(20).Bold();
-                text.Item().Text($"Pay period: {Date(run.Start)} – {Date(run.End)} ({run.WeekCount} {(run.WeekCount == 1 ? "week" : "weeks")})");
-                text.Item().Text($"Payout date: {Date(run.PayoutDate)}");
-                if (run.LockedAt is { } lockedAt)
-                    text.Item().Text($"Finalized: {lockedAt.ToString("g", Culture)}");
-            });
-        });
-
-        page.Content().Column(content =>
+    public Task<string> WriteAsync(PayrollReport report) =>
+        Task.FromResult(PdfLayout.Write(options, "Payroll", report, "Payroll Report", content =>
         {
             content.Spacing(18);
-            foreach (var statement in run.Statements)
+            foreach (var statement in report.Run.Statements)
                 content.Item().ShowEntire().Element(e => EmployeeSection(e, statement));
-            content.Item().ShowEntire().Element(e => Totals(e, run));
-        });
-
-        page.Footer().AlignCenter().Text(t =>
-        {
-            t.Span("Page ");
-            t.CurrentPageNumber();
-            t.Span(" of ");
-            t.TotalPages();
-        });
-    }));
+            content.Item().ShowEntire().Element(e => Totals(e, report.Run));
+        }));
 
     private static void EmployeeSection(IContainer container, PayStatementDto s) => container.Column(section =>
     {
@@ -163,10 +118,4 @@ public sealed class PdfPayrollReportWriter(StorageOptions options) : IPayrollRep
 
     private static void TotalCell(TableDescriptor table, decimal hours) =>
         table.Cell().BorderTop(0.5f).Padding(3).AlignRight().Text(Hours(hours)).Bold();
-
-    private static string Money(decimal amount) => amount.ToString("C", Culture);
-
-    private static string Hours(decimal hours) => hours.ToString("0.00", Culture);
-
-    private static string Date(DateOnly date) => date.ToString("MMM d, yyyy", Culture);
 }

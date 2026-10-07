@@ -119,6 +119,17 @@ internal sealed class RecordingReportWriter : IPayrollReportWriter
     }
 }
 
+internal sealed class RecordingHoursReportWriter : IHoursReportWriter
+{
+    public List<PayrollReport> Written { get; } = [];
+
+    public Task<string> WriteAsync(PayrollReport report)
+    {
+        Written.Add(report);
+        return Task.FromResult($"hours-{report.Run.Start:yyyy-MM-dd}.pdf");
+    }
+}
+
 internal sealed class RecordingBackup : IDatabaseBackup
 {
     public List<(DateTime Timestamp, int BackupsToKeep)> Calls { get; } = [];

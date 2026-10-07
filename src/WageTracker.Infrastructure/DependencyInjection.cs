@@ -8,7 +8,7 @@ namespace WageTracker.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Registers the SQLite repositories, the database backup, and the PDF report writer. The database is created and migrated
+    /// Registers the SQLite repositories, the database backup, and the PDF report writers. The database is created and migrated
     /// the first time it is opened.
     /// </summary>
     public static IServiceCollection AddWageTrackerInfrastructure(this IServiceCollection services, Action<StorageOptions>? configure = null)
@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddSingleton<IPayrollSettingsRepository, SqlitePayrollSettingsRepository>();
         services.AddSingleton<IPayrollRunRepository, SqlitePayrollRunRepository>();
         services.AddSingleton<IPayrollReportWriter, PdfPayrollReportWriter>();
+        services.AddSingleton<IHoursReportWriter, PdfHoursReportWriter>();
         services.AddSingleton<IDatabaseBackup, SqliteDatabaseBackup>();
         return services;
     }

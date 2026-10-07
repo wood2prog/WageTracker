@@ -70,6 +70,13 @@ public sealed class PayrollService(
         return await reportWriter.WriteAsync(Report(ToDto(run, await employees.ListAsync()), current));
     }
 
+    /// <summary>
+    /// The payroll for the period containing <paramref name="date"/>, as <see cref="GetRunAsync"/> gives it,
+    /// with the company details for a report header.
+    /// </summary>
+    public async Task<PayrollReport> GetReportAsync(DateOnly date) =>
+        Report(await GetRunAsync(date), await settings.RequireAsync());
+
     private static PayrollReport Report(PayrollRunDto run, PayrollSettings current) =>
         new(run, current.CompanyName, current.CompanyLogo);
 

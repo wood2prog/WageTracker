@@ -51,6 +51,23 @@ public class ReportServiceTests
         Assert.Equal(2, app.Reports.Written.Count);
     }
 
+    [Fact]
+    public async Task The_hours_summary_previews_an_open_period()
+    {
+        var app = new TestApp();
+        var ada = await app.AddHourlyAsync(20m);
+        await app.WorkWeekAsync(ada.Id, 9m);
+        var writer = new RecordingHoursReportWriter();
+        var service = new ReportService([new HoursSummaryReport(app.PayrollService, writer)]);
+
+        Assert.False(Assert.Single(service.List()).RequiresFinalizedPeriod);
+        await service.CreateAsync("Hours summary", Sunday);
+
+        var run = Assert.Single(writer.Written).Run;
+        Assert.False(run.IsLocked);
+        Assert.Equal(45m, run.Statements.Single().Weeks.Sum(w => w.TotalHours));
+    }
+
     private sealed class StubReport(string name, bool requiresFinalizedPeriod = false) : IPeriodReport
     {
         public List<DateOnly> Dates { get; } = [];
