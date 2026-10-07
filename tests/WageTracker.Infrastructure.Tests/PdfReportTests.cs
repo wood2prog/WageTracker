@@ -42,6 +42,18 @@ public sealed class PdfReportTests : IDisposable
     }
 
     [Fact]
+    public async Task Writes_the_regular_and_overtime_hours()
+    {
+        var run = new PayrollRunDto(new DateOnly(2026, 9, 6), new DateOnly(2026, 9, 19), 2, new DateOnly(2026, 10, 10),
+            true, new DateTime(2026, 9, 21, 9, 0, 0), [Statement("Ada Lovelace", 2), Statement("Grace Hopper", 2)]);
+
+        var path = await new PdfHoursReportWriter(_db.Options).WriteRegularAndOvertimeAsync(new PayrollReport(run, null, null));
+
+        Assert.Equal(Path.Combine(_db.Options.ReportsFolder, "Regular and overtime hours 2026-09-06 to 2026-09-19.pdf"), path);
+        Assert.True(new FileInfo(path).Length > 1000);
+    }
+
+    [Fact]
     public async Task Shows_the_company_name_and_logo()
     {
         var run = new PayrollRunDto(new DateOnly(2026, 9, 6), new DateOnly(2026, 9, 12), 1, new DateOnly(2026, 10, 10),

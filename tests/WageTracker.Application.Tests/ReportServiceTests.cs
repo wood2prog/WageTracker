@@ -68,6 +68,23 @@ public class ReportServiceTests
         Assert.Equal(45m, run.Statements.Single().Weeks.Sum(w => w.TotalHours));
     }
 
+    [Fact]
+    public async Task The_regular_and_overtime_report_previews_an_open_period()
+    {
+        var app = new TestApp();
+        var ada = await app.AddHourlyAsync(20m);
+        await app.WorkWeekAsync(ada.Id, 9m);
+        var writer = new RecordingHoursReportWriter();
+        var service = new ReportService([new RegularAndOvertimeHoursReport(app.PayrollService, writer)]);
+
+        Assert.False(Assert.Single(service.List()).RequiresFinalizedPeriod);
+        await service.CreateAsync("Regular and overtime hours", Sunday);
+
+        Assert.Empty(writer.Written);
+        var week = Assert.Single(Assert.Single(Assert.Single(writer.WrittenRegularAndOvertime).Run.Statements).Weeks);
+        Assert.Equal((40m, 5m, 45m), (week.RegularHours, week.OvertimeHours, week.TotalHours));
+    }
+
     private sealed class StubReport(string name, bool requiresFinalizedPeriod = false) : IPeriodReport
     {
         public List<DateOnly> Dates { get; } = [];

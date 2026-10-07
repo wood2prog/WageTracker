@@ -30,6 +30,7 @@ public static class DependencyInjection
         // The pay period reports, in the order the Payroll tab lists them.
         services.AddTransient<IPeriodReport, PayrollPeriodReport>();
         services.AddTransient<IPeriodReport, HoursSummaryReport>();
+        services.AddTransient<IPeriodReport, RegularAndOvertimeHoursReport>();
         return services;
     }
 }

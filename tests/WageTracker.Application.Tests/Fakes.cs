@@ -128,6 +128,14 @@ internal sealed class RecordingHoursReportWriter : IHoursReportWriter
         Written.Add(report);
         return Task.FromResult($"hours-{report.Run.Start:yyyy-MM-dd}.pdf");
     }
+
+    public List<PayrollReport> WrittenRegularAndOvertime { get; } = [];
+
+    public Task<string> WriteRegularAndOvertimeAsync(PayrollReport report)
+    {
+        WrittenRegularAndOvertime.Add(report);
+        return Task.FromResult($"regular-and-overtime-{report.Run.Start:yyyy-MM-dd}.pdf");
+    }
 }
 
 internal sealed class RecordingBackup : IDatabaseBackup
