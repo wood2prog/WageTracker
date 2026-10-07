@@ -14,7 +14,7 @@ public sealed class PdfReportTests : IDisposable
         Guid.NewGuid(), name, CompensationType.Hourly, 20m, 1.5m, 40m * weeks, 8m, 2m, 40m * weeks + 6m, 2m, 800m * weeks, 60m, deferred,
         vacationDays, vacationDays * 200m, 800m * weeks + 60m + vacationDays * 200m,
         Enumerable.Range(0, weeks).Select(i => new WeekDto(
-            new DateOnly(2026, 9, 6).AddDays(7 * i), new DateOnly(2026, 9, 12).AddDays(7 * i), 40m, 2m, 40m, 2m)).ToList());
+            new DateOnly(2026, 9, 6).AddDays(7 * i), new DateOnly(2026, 9, 12).AddDays(7 * i), 40m, 2m, 40m, 2m, 40m, 2m)).ToList());
 
     [Fact]
     public async Task Writes_a_pdf_named_for_the_period()

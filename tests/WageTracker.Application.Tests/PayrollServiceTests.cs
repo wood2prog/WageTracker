@@ -115,6 +115,19 @@ public class PayrollServiceTests
     }
 
     [Fact]
+    public async Task Salaried_weeks_total_the_hours_the_salary_covers_plus_eligible_overtime()
+    {
+        var app = new TestApp();
+        var eligible = await app.AddSalariedAsync(overtimeEligible: true);
+        await app.AddSalariedAsync(overtimeEligible: false);
+        await app.WorkWeekAsync(eligible.Id, 9m);
+
+        var run = await app.PayrollService.GetRunAsync(Sunday);
+
+        Assert.Equal([45m, 40m], run.Statements.OrderBy(s => s.EmployeeId != eligible.Id).Select(s => Assert.Single(s.Weeks).TotalHours));
+    }
+
+    [Fact]
     public async Task The_report_can_be_exported_again_only_for_a_locked_period()
     {
         var app = new TestApp();

@@ -71,13 +71,13 @@ public sealed class PayStatement(
     public decimal OvertimeHours => Weeks.Sum(w => w.OvertimeHours);
 
     /// <summary>
-    /// The hours the base pay covers. Hourly: the regular hours. Salary: the base pay at the hourly rate, so a
-    /// full week counts as the overtime threshold and a partial week a fifth of it per weekday employed,
-    /// whatever hours were recorded.
+    /// The hours the base pay covers. Hourly: the regular hours. Salary: the overtime threshold for a full week
+    /// and a fifth of it per weekday employed for a partial week, whatever hours were recorded.
     /// </summary>
-    public decimal CompensatedRegularHours => CompensationType == CompensationType.Salary
-        ? HourlyRate == 0m ? 0m : Rounding.Hours(BasePay / HourlyRate)
-        : Weeks.Sum(w => w.RegularHours);
+    public decimal CompensatedRegularHours => Weeks.Sum(w => w.CompensatedRegularHours);
+
+    /// <summary>Overtime hours in <paramref name="week"/> that earn overtime pay.</summary>
+    public decimal CompensatedOvertimeHoursIn(WeekSummary week) => OvertimeEligible ? week.OvertimeHours : 0m;
 
     /// <summary>
     /// Overtime hours that earn overtime pay: none for salaried employees who are not eligible. Salaried overtime
@@ -187,7 +187,11 @@ public sealed class PayStatement(
         var countedTowardOvertime = worked + (settings.TimeOffCountsTowardOvertime ? timeOffHours : 0m);
         var overtime = Math.Max(0m, countedTowardOvertime - settings.OvertimeThresholdHours);
 
-        return new WeekSummary(week, worked, timeOffHours, overtime);
+        decimal? salaryHours = employee.Compensation.Type == CompensationType.Salary
+            ? Rounding.Hours(settings.OvertimeThresholdHours * employee.WeekdaysEmployed(week.Start, week.End) / 5m)
+            : null;
+
+        return new WeekSummary(week, worked, timeOffHours, overtime, salaryHours);
     }
 
     /// <summary>

@@ -211,7 +211,7 @@ public sealed class RepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task Upgrading_takes_locked_salaried_overtime_eligibility_from_the_employee()
+    public async Task Upgrading_fills_in_locked_salaried_overtime_eligibility_and_weekly_hours()
     {
         Directory.CreateDirectory(_db.Folder);
         await using (var v3 = new SqliteConnection($"Data Source={_db.Options.DatabasePath};Pooling=False"))
@@ -225,21 +225,34 @@ public sealed class RepositoryTests : IDisposable
                     compensation_amount, overtime_eligible, overtime_percentage, vacation_days_permitted)
                 VALUES ('00000000-0000-0000-0000-00000000000a', 'Ada', 'L', '1990-01-01', '2020-01-01', 'FullTime', 'Hourly', '20', 1, '50', 10),
                        ('00000000-0000-0000-0000-00000000000b', 'Grace', 'H', '1990-01-01', '2020-01-01', 'FullTime', 'Salary', '52000', 0, '50', 10),
-                       ('00000000-0000-0000-0000-00000000000c', 'Alan', 'T', '1990-01-01', '2020-01-01', 'FullTime', 'Salary', '52000', 1, '50', 10);
-                INSERT INTO payroll_runs VALUES ('00000000-0000-0000-0000-000000000001', '2026-09-06', '2026-09-12', 1, '2026-10-10', 'Locked', '2026-09-14T09:00:00.0000000');
+                       ('00000000-0000-0000-0000-00000000000c', 'Alan', 'T', '1990-01-01', '2026-09-09', 'FullTime', 'Salary', '52000', 1, '50', 10);
+                INSERT INTO payroll_runs VALUES ('00000000-0000-0000-0000-000000000001', '2026-09-06', '2026-09-19', 2, '2026-10-10', 'Locked', '2026-09-21T09:00:00.0000000');
                 INSERT INTO pay_statements (run_id, employee_id, compensation_type, hourly_rate, overtime_multiplier, base_pay,
                     overtime_pay, deferred_overtime_pay, vacation_days_paid_out, vacation_payout)
-                VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Hourly', '20', '1.5', '800', '0', '0', 0, '0'),
-                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Salary', '25', '1.5', '1000', '0', '0', 0, '0'),
-                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000c', 'Salary', '25', '1.5', '1000', '0', '0', 0, '0');
+                VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Hourly', '20', '1.5', '1600', '0', '0', 0, '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Salary', '25', '1.5', '2000', '0', '0', 0, '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000c', 'Salary', '25', '1.5', '1600', '0', '0', 0, '0');
+                INSERT INTO pay_statement_weeks (run_id, employee_id, week_start, worked_hours, time_off_hours, overtime_hours)
+                VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', '2026-09-06', '40', '0', '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', '2026-09-13', '40', '0', '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', '2026-09-06', '0', '0', '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', '2026-09-13', '0', '0', '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000c', '2026-09-06', '0', '0', '0'),
+                       ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000c', '2026-09-13', '0', '0', '0');
                 """;
             command.ExecuteNonQuery();
         }
 
         var run = (await new SqlitePayrollRunRepository(_db.Factory).GetByPeriodStartAsync(Sunday))!;
 
-        Assert.Equal([true, false, true], run.Statements.OrderBy(s => s.EmployeeId).Select(s => s.OvertimeEligible));
-        Assert.Equal(40m, run.Statements.Single(s => s.CompensationType == CompensationType.Salary && !s.OvertimeEligible).CompensatedRegularHours);
+        var statements = run.Statements.OrderBy(s => s.EmployeeId).ToList();
+
+        Assert.Equal([true, false, true], statements.Select(s => s.OvertimeEligible));
+        Assert.Equal([null, null], statements[0].Weeks.Select(w => w.SalaryHours));
+        Assert.Equal([40m, 40m], statements[0].Weeks.Select(w => w.CompensatedRegularHours));
+        Assert.Equal([40m, 40m], statements[1].Weeks.Select(w => w.SalaryHours));
+        // Hired Wednesday of the first week: 3 of the 8 weekdays employed, of 64 hours.
+        Assert.Equal([24m, 40m], statements[2].Weeks.Select(w => w.SalaryHours));
     }
 
     [Fact]

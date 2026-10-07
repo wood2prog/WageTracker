@@ -98,7 +98,7 @@ Domain entities named in the spec: `Employee`, `TimeEntry`, `CompensatedTimeOff`
   - In a leaver's final period (the one containing their end date), unused vacation is paid out, and salaried overtime earned that period is paid then instead of being deferred.
 - **Full-time vs. part-time**: only full-time employees get compensated time off (holidays, vacation, and other types) and the year-end vacation payout. Part-time employees are paid only for hours worked, plus overtime.
 - **Compensation types**: hourly and salary. Salary pays annual ÷ 52 for each week in the period.
-  - **Compensated hours** (`PayStatement.CompensatedRegularHours`/`CompensatedOvertimeHours`), used by the hours reports: for hourly, the regular and overtime hours. For salary, regular is base pay ÷ hourly rate (a full week is the overtime threshold, prorated by weekday), whatever hours were recorded; overtime counts only if eligible, in the period it's earned. Each statement stores `OvertimeEligible` for this.
+  - **Compensated hours** (`PayStatement.CompensatedRegularHours`/`CompensatedOvertimeHours`, and per week in `WeekDto.TotalHours`), used by the hours reports and the payroll report's Total hours column: for hourly, the regular and overtime hours. For salary, each week stores `SalaryHours` (the overtime threshold ÷ 5 per weekday employed), whatever hours were recorded; overtime counts only if eligible, in the week it's earned. Each statement stores `OvertimeEligible` for this.
 - **Overtime**:
   - Overtime is hours over the weekly threshold. The default threshold is 40, and it can be changed in settings.
   - Overtime is figured for each week, never across a whole pay period.

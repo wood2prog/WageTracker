@@ -3,13 +3,18 @@ using WageTracker.Domain.Payroll;
 
 namespace WageTracker.Application.Payroll;
 
-public sealed record WeekDto(DateOnly Start, DateOnly End, decimal WorkedHours, decimal TimeOffHours, decimal RegularHours, decimal OvertimeHours)
+/// <param name="CompensatedRegularHours">The hours the base pay covers; for salary, the hours the week's salary covers.</param>
+/// <param name="CompensatedOvertimeHours">Overtime hours that earn overtime pay, whenever it is paid.</param>
+public sealed record WeekDto(
+    DateOnly Start, DateOnly End, decimal WorkedHours, decimal TimeOffHours, decimal RegularHours, decimal OvertimeHours,
+    decimal CompensatedRegularHours, decimal CompensatedOvertimeHours)
 {
-    /// <summary>All hours paid for the week: worked plus time off, or regular plus overtime.</summary>
-    public decimal TotalHours => RegularHours + OvertimeHours;
+    /// <summary>All hours paid for the week: for salary, the hours the salary covers rather than the hours recorded.</summary>
+    public decimal TotalHours => CompensatedRegularHours + CompensatedOvertimeHours;
 
-    internal static WeekDto From(WeekSummary w) =>
-        new(w.Week.Start, w.Week.End, w.WorkedHours, w.TimeOffHours, w.RegularHours, w.OvertimeHours);
+    internal static WeekDto From(WeekSummary w, PayStatement s) =>
+        new(w.Week.Start, w.Week.End, w.WorkedHours, w.TimeOffHours, w.RegularHours, w.OvertimeHours,
+            w.CompensatedRegularHours, s.CompensatedOvertimeHoursIn(w));
 }
 
 /// <param name="OvertimePay">Overtime paid in this period, including salaried overtime carried from the previous one.</param>
@@ -55,7 +60,7 @@ public sealed record PayStatementDto(
         s.VacationDaysPaidOut,
         s.VacationPayout,
         s.GrossPay,
-        s.Weeks.Select(WeekDto.From).ToList());
+        s.Weeks.Select(w => WeekDto.From(w, s)).ToList());
 }
 
 /// <summary>A pay period's payroll. While it is open, the statements are a live preview; once locked, they are the stored snapshot.</summary>

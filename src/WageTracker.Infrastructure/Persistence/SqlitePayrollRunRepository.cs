@@ -47,11 +47,11 @@ public sealed class SqlitePayrollRunRepository(SqliteConnectionFactory db) : IPa
             foreach (var w in s.Weeks)
             {
                 connection.Execute(tx, """
-                    INSERT INTO pay_statement_weeks (run_id, employee_id, week_start, worked_hours, time_off_hours, overtime_hours)
-                    VALUES ($run, $e, $week, $worked, $timeOff, $ot)
+                    INSERT INTO pay_statement_weeks (run_id, employee_id, week_start, worked_hours, time_off_hours, overtime_hours, salary_hours)
+                    VALUES ($run, $e, $week, $worked, $timeOff, $ot, $salary)
                     """,
                     ("$run", run.Id), ("$e", s.EmployeeId), ("$week", w.Week.Start), ("$worked", w.WorkedHours),
-                    ("$timeOff", w.TimeOffHours), ("$ot", w.OvertimeHours));
+                    ("$timeOff", w.TimeOffHours), ("$ot", w.OvertimeHours), ("$salary", w.SalaryHours));
             }
         }
         tx.Commit();
@@ -83,7 +83,8 @@ public sealed class SqlitePayrollRunRepository(SqliteConnectionFactory db) : IPa
     {
         var weeks = (await connection.QueryAsync("SELECT * FROM pay_statement_weeks WHERE run_id = $run ORDER BY week_start",
                 r => (EmployeeId: r.Guid("employee_id"), Week: new WeekSummary(
-                    new WorkWeek(r.Date("week_start")), r.Decimal("worked_hours"), r.Decimal("time_off_hours"), r.Decimal("overtime_hours"))),
+                    new WorkWeek(r.Date("week_start")), r.Decimal("worked_hours"), r.Decimal("time_off_hours"), r.Decimal("overtime_hours"),
+                    r.DecimalOrNull("salary_hours"))),
                 ("$run", runId)))
             .ToLookup(w => w.EmployeeId, w => w.Week);
 

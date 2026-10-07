@@ -166,9 +166,10 @@ public class PayStatementTests
     public void A_salaried_partial_week_is_compensated_a_fifth_of_the_threshold_per_weekday_employed()
     {
         // Hired Wednesday: Wednesday, Thursday, and Friday are paid.
-        var statement = Calculate(Salaried(hired: Sunday.AddDays(3)), Settings());
+        var statement = Calculate(Salaried(hired: Sunday.AddDays(3)), Settings(PayPeriodSchedule.BiWeekly(Sunday)));
 
-        Assert.Equal(24m, statement.CompensatedRegularHours);
+        Assert.Equal([24m, 40m], statement.Weeks.Select(w => w.SalaryHours));
+        Assert.Equal(64m, statement.CompensatedRegularHours);
     }
 
     [Fact]
@@ -182,6 +183,16 @@ public class PayStatementTests
 
         Assert.Equal((40m, 5m, 45m), (paid.CompensatedRegularHours, paid.CompensatedOvertimeHours, paid.CompensatedHours));
         Assert.Equal((40m, 0m, 40m), (unpaid.CompensatedRegularHours, unpaid.CompensatedOvertimeHours, unpaid.CompensatedHours));
+    }
+
+    [Fact]
+    public void Hourly_weeks_have_no_salary_hours()
+    {
+        var employee = Hourly();
+
+        var statement = Calculate(employee, Settings(), WorkWeek(employee, 8m));
+
+        Assert.Null(Assert.Single(statement.Weeks).SalaryHours);
     }
 
     [Fact]

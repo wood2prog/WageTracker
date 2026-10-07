@@ -148,5 +148,40 @@ internal static class Schema
         SET overtime_eligible = COALESCE((SELECT e.overtime_eligible FROM employees e WHERE e.id = pay_statements.employee_id), 0)
         WHERE compensation_type = 'Salary';
         """,
+
+        // Each salaried week of a locked statement gets its share of the hours the base pay covered (base pay ÷
+        // hourly rate), in proportion to the weekdays the employee was employed that week.
+        """
+        ALTER TABLE pay_statement_weeks ADD COLUMN salary_hours TEXT NULL;
+
+        CREATE TEMP TABLE salary_week_days AS
+        SELECT w.run_id, w.employee_id, w.week_start,
+            CAST(s.base_pay AS REAL) AS base_pay, CAST(s.hourly_rate AS REAL) AS hourly_rate,
+              (date(w.week_start, '+1 day') BETWEEN e.hire_date AND COALESCE(e.end_date, '9999-12-31'))
+            + (date(w.week_start, '+2 day') BETWEEN e.hire_date AND COALESCE(e.end_date, '9999-12-31'))
+            + (date(w.week_start, '+3 day') BETWEEN e.hire_date AND COALESCE(e.end_date, '9999-12-31'))
+            + (date(w.week_start, '+4 day') BETWEEN e.hire_date AND COALESCE(e.end_date, '9999-12-31'))
+            + (date(w.week_start, '+5 day') BETWEEN e.hire_date AND COALESCE(e.end_date, '9999-12-31')) AS days
+        FROM pay_statement_weeks w
+        JOIN pay_statements s ON s.run_id = w.run_id AND s.employee_id = w.employee_id
+        JOIN employees e ON e.id = w.employee_id
+        WHERE s.compensation_type = 'Salary';
+
+        UPDATE pay_statement_weeks
+        SET salary_hours = (
+            SELECT printf('%.2f', CASE WHEN d.hourly_rate = 0 OR t.days = 0 THEN 0
+                ELSE ROUND(d.base_pay / d.hourly_rate * d.days / t.days, 2) END)
+            FROM salary_week_days d
+            JOIN (SELECT run_id, employee_id, SUM(days) AS days FROM salary_week_days GROUP BY run_id, employee_id) t
+                ON t.run_id = d.run_id AND t.employee_id = d.employee_id
+            WHERE d.run_id = pay_statement_weeks.run_id AND d.employee_id = pay_statement_weeks.employee_id
+                AND d.week_start = pay_statement_weeks.week_start)
+        WHERE EXISTS (
+            SELECT 1 FROM salary_week_days d
+            WHERE d.run_id = pay_statement_weeks.run_id AND d.employee_id = pay_statement_weeks.employee_id
+                AND d.week_start = pay_statement_weeks.week_start);
+
+        DROP TABLE salary_week_days;
+        """,
     ];
 }

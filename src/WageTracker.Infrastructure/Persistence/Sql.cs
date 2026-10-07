@@ -68,6 +68,9 @@ internal static class Sql
     public static decimal Decimal(this SqliteDataReader r, string column) =>
         decimal.Parse(r.Text(column), NumberStyles.Number, CultureInfo.InvariantCulture);
 
+    public static decimal? DecimalOrNull(this SqliteDataReader r, string column) =>
+        r.IsDBNull(r.GetOrdinal(column)) ? null : r.Decimal(column);
+
     public static DateOnly Date(this SqliteDataReader r, string column) =>
         DateOnly.ParseExact(r.Text(column), DateFormat, CultureInfo.InvariantCulture);
 
